@@ -1,0 +1,55 @@
+# Build output
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Internal development documentation
+specs/
+.claude/
+.specify/
+CLAUDE.md
+"FlakeGuard Spec.md"
+MILESTONE-*.md
+thoughts/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+
+# Coverage reports
+coverage.out
+coverage.html
+*.coverprofile
+
+# Vendor directory (if using go mod vendor)
+# vendor/
+
+# Local database files
+*.db
+*.sqlite

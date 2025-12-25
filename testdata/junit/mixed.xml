@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="MixedResults" tests="5" failures="1" errors="1" skipped="1" time="0.789">
+    <testcase classname="com.example.MixedTest" name="testPass" time="0.123"/>
+    <testcase classname="com.example.MixedTest" name="testFail" time="0.234">
+      <failure message="Test failed">Assertion failed</failure>
+    </testcase>
+    <testcase classname="com.example.MixedTest" name="testError" time="0.111">
+      <error message="NullPointerException" type="java.lang.NullPointerException">
+java.lang.NullPointerException: Cannot invoke method on null object
+  at com.example.MixedTest.testError(MixedTest.java:78)
+      </error>
+    </testcase>
+    <testcase classname="com.example.MixedTest" name="testSkip" time="0.000">
+      <skipped message="Not applicable"/>
+    </testcase>
+    <testcase classname="com.example.MixedTest" name="testAnotherPass" time="0.321"/>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,30 @@
+{{define "content"}}
+<div style="max-width: 400px; margin: 0 auto;">
+    <h2>Sign Up</h2>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    <form method="POST" action="/api/v1/auth/signup">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Minimum 8 characters</small>
+        </div>
+
+        <button type="submit">Create Account</button>
+
+        <div class="text-center mt-1">
+            <a href="/login" class="link">Already have an account? Log in</a>
+        </div>
+    </form>
+</div>
+{{end}}

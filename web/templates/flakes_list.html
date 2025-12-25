@@ -1,0 +1,96 @@
+{{define "content"}}
+<div style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0;">Flaky Tests</h2>
+        <a href="/orgs/{{index .Data "OrgSlug"}}/projects/{{index .Data "ProjectSlug"}}/settings" class="link">← Back to Project Settings</a>
+    </div>
+    <p style="color: #666; margin-bottom: 2rem;">Project: {{index .Data "ProjectName"}}</p>
+
+    <!-- Filters Form -->
+    <form method="GET" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end;">
+            <div class="form-group" style="margin: 0;">
+                <label for="days">Time Range</label>
+                <select name="days" id="days" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="7" {{if eq (index .Data "Days") 7}}selected{{end}}>Last 7 days</option>
+                    <option value="30" {{if eq (index .Data "Days") 30}}selected{{end}}>Last 30 days</option>
+                    <option value="90" {{if eq (index .Data "Days") 90}}selected{{end}}>Last 90 days</option>
+                    <option value="365" {{if eq (index .Data "Days") 365}}selected{{end}}>All time</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+                <label for="repo">Repository</label>
+                <input type="text" name="repo" id="repo" value="{{index .Data "Repo"}}"
+                       placeholder="e.g., owner/repo"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+
+            <div class="form-group" style="margin: 0;">
+                <label for="job_name">Job Name</label>
+                <input type="text" name="job_name" id="job_name" value="{{index .Data "JobName"}}"
+                       placeholder="e.g., test-suite"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="submit" style="flex: 1;">Apply Filters</button>
+                <a href="/orgs/{{index .Data "OrgSlug"}}/projects/{{index .Data "ProjectSlug"}}/flakes"
+                   style="display: inline-block; padding: 0.75rem 1.5rem; background: #6c757d; color: white; text-decoration: none; border-radius: 4px; text-align: center;">Clear</a>
+            </div>
+        </div>
+    </form>
+
+    {{$flakes := index .Data "Flakes"}}
+    {{$total := index .Data "Total"}}
+    {{$orgSlug := index .Data "OrgSlug"}}
+    {{$projectSlug := index .Data "ProjectSlug"}}
+
+    {{if eq $total 0}}
+        <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 1.5rem; border-radius: 4px; text-align: center;">
+            {{if or (ne (index .Data "Repo") "") (ne (index .Data "JobName") "")}}
+                <p style="margin: 0; color: #1976D2;">No flakes match your filters. Try adjusting the filter criteria.</p>
+            {{else}}
+                <p style="margin: 0; color: #1976D2;">No flakes detected in this project. Great job!</p>
+            {{end}}
+        </div>
+    {{else}}
+        <p style="color: #666; margin-bottom: 1rem;">Showing {{$total}} flaky test(s)</p>
+
+        <table class="flakes-table">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">Test Identifier</th>
+                    <th style="text-align: left;">Repository</th>
+                    <th style="text-align: left;">Job</th>
+                    <th style="text-align: center;">Flake Score</th>
+                    <th style="text-align: center;">Mixed/Total</th>
+                    <th style="text-align: left;">Last Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range $flakes}}
+                <tr class="flake-row" onclick="window.location='/orgs/{{$orgSlug}}/projects/{{$projectSlug}}/flakes/{{.TestCaseID}}'">
+                    <td><strong>{{.TestIdentifier}}</strong></td>
+                    <td>{{.RepoFullName}}</td>
+                    <td>{{.JobName}}</td>
+                    <td style="text-align: center;">
+                        <span class="flake-score flake-score-{{if ge .FlakeScore 0.7}}high{{else if ge .FlakeScore 0.4}}medium{{else}}low{{end}}">
+                            {{printf "%.1f%%" (mul .FlakeScore 100)}}
+                        </span>
+                    </td>
+                    <td style="text-align: center;">{{.MixedOutcomeRuns}}/{{.TotalRunsSeen}}</td>
+                    <td>{{.LastSeenAt.Format "2006-01-02 15:04"}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+
+        {{if ge $total 100}}
+        <p style="margin-top: 1rem; color: #666; font-style: italic;">
+            Showing top 100 results. Use filters to narrow down the list.
+        </p>
+        {{end}}
+    {{end}}
+</div>
+{{end}}

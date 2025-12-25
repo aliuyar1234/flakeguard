@@ -1,0 +1,124 @@
+{{define "content"}}
+<div>
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/orgs/{{.OrgID}}/projects" style="color: #3498db; text-decoration: none;">&larr; Back to Projects</a>
+    </div>
+
+    <h2>{{.ProjectName}} Settings</h2>
+    <p style="color: #666; margin-bottom: 2rem;">Manage settings for this project</p>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Success}}
+    <div class="success">{{.Success}}</div>
+    {{end}}
+
+    <!-- Project Details -->
+    <section style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #ddd;">
+        <h3 style="margin-bottom: 1rem; color: #2c3e50;">Project Details</h3>
+        <div style="background-color: #fafafa; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+            <p style="margin-bottom: 0.5rem;"><strong>Name:</strong> {{.ProjectName}}</p>
+            <p style="margin-bottom: 0.5rem;"><strong>Slug:</strong> <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.ProjectSlug}}</code></p>
+            <p style="margin-bottom: 0;"><strong>Default Branch:</strong> <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.DefaultBranch}}</code></p>
+        </div>
+        <a href="/orgs/{{.OrgSlug}}/projects/{{.ProjectSlug}}/flakes" style="display: inline-block; padding: 0.75rem 1.5rem; background-color: #3498db; color: white; text-decoration: none; border-radius: 4px; font-weight: 500;">
+            View Flaky Tests Dashboard
+        </a>
+    </section>
+
+    <!-- API Keys -->
+    <section style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #ddd;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin-bottom: 0; color: #2c3e50;">API Keys</h3>
+            {{if .CanMutate}}
+            <button onclick="document.getElementById('createKeyForm').style.display='block'" style="background-color: #3498db; color: white; padding: 0.5rem 1rem; border-radius: 4px; border: none; cursor: pointer; font-size: 0.9rem;">Create API Key</button>
+            {{end}}
+        </div>
+
+        <!-- Create API Key Form (hidden by default) -->
+        <div id="createKeyForm" style="display: none; background-color: #f0f8ff; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+            <h4 style="margin-bottom: 1rem;">Create New API Key</h4>
+            <form method="POST" action="/api/v1/projects/{{.ProjectID}}/api-keys">
+                <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+                <div class="form-group">
+                    <label for="key_name">Key Name</label>
+                    <input type="text" id="key_name" name="name" required placeholder="CI Pipeline Key">
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit">Generate Key</button>
+                    <button type="button" onclick="document.getElementById('createKeyForm').style.display='none'" style="background-color: #95a5a6;">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        {{if .NewAPIKey}}
+        <div style="background-color: #fff3cd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
+            <h4 style="margin-bottom: 0.5rem; color: #856404;">API Key Created!</h4>
+            <p style="color: #856404; margin-bottom: 1rem;">Save this key now - you won't be able to see it again!</p>
+            <code style="display: block; background-color: #fff; padding: 1rem; border-radius: 4px; font-family: monospace; word-break: break-all; border: 1px solid #ffc107;">{{.NewAPIKey}}</code>
+        </div>
+        {{end}}
+
+        {{if .APIKeys}}
+        <div style="background-color: #fafafa; padding: 1rem; border-radius: 4px;">
+            {{range .APIKeys}}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; margin-bottom: 0.5rem; background-color: white; border-radius: 4px; border: 1px solid #ddd;">
+                <div>
+                    <strong>{{.Name}}</strong>
+                    <p style="color: #666; margin: 0.25rem 0 0 0; font-size: 0.9rem;">
+                        Created: {{.CreatedAt.Format "2006-01-02 15:04:05"}}
+                        {{if .RevokedAt}} | <span style="color: #c33;">Revoked</span>{{end}}
+                    </p>
+                </div>
+                {{if not .RevokedAt}}
+                {{if $.CanMutate}}
+                <form method="POST" action="/api/v1/projects/{{$.ProjectID}}/api-keys/{{.ID}}/revoke" style="margin: 0;">
+                    <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" onclick="return confirm('Are you sure you want to revoke this API key?')" style="background-color: #e74c3c; font-size: 0.9rem; padding: 0.5rem 1rem;">Revoke</button>
+                </form>
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <p style="color: #666; padding: 1rem; background-color: #fafafa; border-radius: 4px;">No API keys yet.</p>
+        {{end}}
+    </section>
+
+    <!-- Slack Integration -->
+    <section style="margin-bottom: 2rem;">
+        <h3 style="margin-bottom: 1rem; color: #2c3e50;">Slack Integration</h3>
+
+        {{if .SlackConfigured}}
+        <div style="background-color: #d4edda; padding: 1rem; border-radius: 4px; border-left: 4px solid #28a745; margin-bottom: 1rem;">
+            <p style="color: #155724; margin-bottom: 0;">Slack webhook is configured</p>
+        </div>
+        {{if .CanMutate}}
+        <form method="POST" action="/api/v1/projects/{{.ProjectID}}/slack/remove">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <input type="hidden" name="_method" value="DELETE">
+            <button type="submit" onclick="return confirm('Are you sure you want to remove Slack integration?')" style="background-color: #e74c3c;">Remove Slack Integration</button>
+        </form>
+        {{end}}
+        {{else}}
+        {{if .CanMutate}}
+        <form method="POST" action="/api/v1/projects/{{.ProjectID}}/slack">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <div class="form-group">
+                <label for="webhook_url">Slack Webhook URL</label>
+                <input type="text" id="webhook_url" name="webhook_url" required placeholder="https://hooks.slack.com/services/...">
+                <small style="color: #666; display: block; margin-top: 0.25rem;">Get your webhook URL from Slack's Incoming Webhooks app</small>
+            </div>
+            <button type="submit">Configure Slack</button>
+        </form>
+        {{else}}
+        <p style="color: #666; padding: 1rem; background-color: #fafafa; border-radius: 4px;">Slack integration not configured</p>
+        {{end}}
+        {{end}}
+    </section>
+</div>
+{{end}}

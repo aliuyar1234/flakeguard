@@ -1,0 +1,238 @@
+# Complete FlakeGuard Integration Example
+# This workflow demonstrates best practices for integrating FlakeGuard with GitHub Actions
+
+name: Tests with FlakeGuard
+
+on:
+  # Run on push to main and pull requests
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Single test job example
+  test-single:
+    name: Test on Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Setup test environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Step 4: Run tests and generate JUnit XML
+      # Most test frameworks support JUnit output format
+      - name: Run tests
+        run: |
+          # Create output directory
+          mkdir -p test-results
+
+          # Run tests with JUnit reporter
+          # Example for Jest (Node.js)
+          npm test -- --reporters=default --reporters=jest-junit
+
+          # Example for pytest (Python)
+          # pytest --junit-xml=test-results/junit.xml
+
+          # Example for Go
+          # go test -v ./... | go-junit-report > test-results/junit.xml
+
+      # Step 5: Upload results to FlakeGuard
+      # Important: Use 'if: always()' to upload even when tests fail
+      - name: Upload to FlakeGuard
+        uses: ./action  # Replace with your-org/flakeguard-action@v1 when published
+        if: always()  # Upload even if tests fail - flakes often cause failures
+        with:
+          flakeguard_url: 'https://flakeguard.example.com'
+          project_slug: 'my-project'
+          api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
+          junit_paths: 'test-results/**/*.xml'
+
+  # Matrix builds example - distinguishing different configurations
+  test-matrix:
+    name: Test on ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Don't cancel other jobs if one fails
+      fail-fast: false
+
+      matrix:
+        # Test on multiple operating systems
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+        # Test on multiple Python versions
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Setup Python
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-junit
+
+      # Step 4: Run tests with JUnit output
+      - name: Run tests
+        run: |
+          # Create output directory
+          mkdir -p test-results
+
+          # Run pytest with JUnit XML output
+          pytest --junit-xml=test-results/junit.xml --verbose
+
+      # Step 5: Upload to FlakeGuard with job variant
+      # Use job_variant to distinguish results from different matrix combinations
+      - name: Upload to FlakeGuard
+        uses: ./action
+        if: always()
+        with:
+          flakeguard_url: 'https://flakeguard.example.com'
+          project_slug: 'my-project'
+          api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
+          junit_paths: 'test-results/**/*.xml'
+          # Tag results with OS and Python version
+          job_variant: '${{ matrix.os }}-python-${{ matrix.python-version }}'
+
+  # Multiple test suites example - unit, integration, e2e
+  test-multi-suite:
+    name: Multi-Suite Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Setup environment
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      # Step 3: Run unit tests
+      - name: Run unit tests
+        run: |
+          mkdir -p test-results/unit
+          go test -v ./internal/... | go-junit-report > test-results/unit/junit.xml
+
+      # Step 4: Upload unit test results
+      - name: Upload unit tests to FlakeGuard
+        uses: ./action
+        if: always()
+        with:
+          flakeguard_url: 'https://flakeguard.example.com'
+          project_slug: 'my-project'
+          api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
+          junit_paths: 'test-results/unit/**/*.xml'
+          job_variant: 'unit-tests'
+
+      # Step 5: Run integration tests
+      - name: Run integration tests
+        run: |
+          mkdir -p test-results/integration
+          go test -v ./tests/integration/... | go-junit-report > test-results/integration/junit.xml
+
+      # Step 6: Upload integration test results
+      - name: Upload integration tests to FlakeGuard
+        uses: ./action
+        if: always()
+        with:
+          flakeguard_url: 'https://flakeguard.example.com'
+          project_slug: 'my-project'
+          api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
+          junit_paths: 'test-results/integration/**/*.xml'
+          job_variant: 'integration-tests'
+
+      # Step 7: Run end-to-end tests
+      - name: Run e2e tests
+        run: |
+          mkdir -p test-results/e2e
+          go test -v ./tests/e2e/... | go-junit-report > test-results/e2e/junit.xml
+
+      # Step 8: Upload e2e test results
+      - name: Upload e2e tests to FlakeGuard
+        uses: ./action
+        if: always()
+        with:
+          flakeguard_url: 'https://flakeguard.example.com'
+          project_slug: 'my-project'
+          api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
+          junit_paths: 'test-results/e2e/**/*.xml'
+          job_variant: 'e2e-tests'
+
+# Notes and Best Practices:
+#
+# 1. Always use 'if: always()' for FlakeGuard upload steps
+#    - This ensures results are uploaded even when tests fail
+#    - Flaky tests often cause test failures, so we need the data
+#
+# 2. Use descriptive job_variant values for matrix builds
+#    - Helps distinguish results from different configurations
+#    - Examples: 'ubuntu-python-3.9', 'windows-node-20', 'macos-go-1.22'
+#
+# 3. Store API key in GitHub Secrets
+#    - Never hardcode API keys in workflow files
+#    - Go to: Settings > Secrets and variables > Actions > New repository secret
+#    - Name: FLAKEGUARD_API_KEY
+#    - Value: [your API key from FlakeGuard dashboard]
+#
+# 4. Verify JUnit XML generation
+#    - Check that your test framework generates valid JUnit XML
+#    - Verify files are created in the expected location
+#    - Add a debug step to list files: 'run: ls -la test-results/'
+#
+# 5. Handle 'no files found' gracefully
+#    - FlakeGuard action exits with 0 (success) if no files match pattern
+#    - This won't fail your workflow if tests didn't run
+#    - Check logs for warning message
+#
+# 6. Optimize for your test framework:
+#
+#    Jest (Node.js):
+#      npm test -- --reporters=jest-junit
+#      # Configure in package.json or jest.config.js
+#
+#    pytest (Python):
+#      pytest --junit-xml=test-results/junit.xml
+#
+#    Go:
+#      go test -v ./... | go-junit-report > test-results/junit.xml
+#      # Requires: go install github.com/jstemmer/go-junit-report/v2@latest
+#
+#    Maven (Java):
+#      mvn test
+#      # JUnit XML automatically created in target/surefire-reports/
+#
+#    Gradle (Java):
+#      gradle test
+#      # JUnit XML in build/test-results/test/
+#
+#    .NET:
+#      dotnet test --logger "junit;LogFilePath=test-results/junit.xml"
+#
+# 7. Monitor FlakeGuard dashboard
+#    - Check for newly detected flakes after each run
+#    - Review flake trends over time
+#    - Prioritize fixing high-rate flakes first

@@ -1,0 +1,30 @@
+{{define "content"}}
+<div style="max-width: 600px; margin: 0 auto;">
+    <h2>Create Organization</h2>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    <form method="POST" action="/api/v1/orgs">
+        <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+        <div class="form-group">
+            <label for="name">Organization Name</label>
+            <input type="text" id="name" name="name" required placeholder="My Organization" value="{{.Name}}">
+            <small style="color: #666; display: block; margin-top: 0.25rem;">The display name for your organization</small>
+        </div>
+
+        <div class="form-group">
+            <label for="slug">Slug</label>
+            <input type="text" id="slug" name="slug" required placeholder="my-org" pattern="[a-z0-9][a-z0-9-]{1,62}[a-z0-9]" value="{{.Slug}}">
+            <small style="color: #666; display: block; margin-top: 0.25rem;">URL-friendly identifier (3-64 characters, lowercase letters, numbers, and hyphens)</small>
+        </div>
+
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit">Create Organization</button>
+            <a href="/orgs" style="padding: 0.75rem 1.5rem; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #666; display: inline-block;">Cancel</a>
+        </div>
+    </form>
+</div>
+{{end}}

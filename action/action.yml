@@ -1,0 +1,43 @@
+name: 'FlakeGuard Upload'
+description: 'Upload JUnit test results to FlakeGuard for flake detection'
+author: 'FlakeGuard'
+
+inputs:
+  flakeguard_url:
+    description: 'FlakeGuard server URL (e.g., https://flakeguard.example.com)'
+    required: true
+  project_slug:
+    description: 'Project slug from FlakeGuard dashboard'
+    required: true
+  api_key:
+    description: 'FlakeGuard API key (use secrets.FLAKEGUARD_API_KEY)'
+    required: true
+  junit_paths:
+    description: 'Glob pattern for JUnit XML files (e.g., "test-results/**/*.xml")'
+    required: true
+  job_variant:
+    description: 'Optional job variant identifier (e.g., "python-3.9", "ubuntu-latest")'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Upload JUnit results to FlakeGuard
+      shell: bash
+      env:
+        FLAKEGUARD_URL: ${{ inputs.flakeguard_url }}
+        PROJECT_SLUG: ${{ inputs.project_slug }}
+        API_KEY: ${{ inputs.api_key }}
+        JUNIT_PATHS: ${{ inputs.junit_paths }}
+        JOB_VARIANT: ${{ inputs.job_variant }}
+      run: |
+        # Mark API key as sensitive to prevent logging
+        echo "::add-mask::$API_KEY"
+
+        # Execute upload script
+        bash "${{ github.action_path }}/upload.sh"
+
+branding:
+  icon: 'check-circle'
+  color: 'green'

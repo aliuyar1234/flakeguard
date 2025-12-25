@@ -1,0 +1,45 @@
+{{define "content"}}
+<div>
+    <div style="margin-bottom: 1.5rem;">
+        <a href="/orgs" style="color: #3498db; text-decoration: none;">&larr; Back to Organizations</a>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <div>
+            <h2 style="margin-bottom: 0.5rem;">{{.OrgName}} Projects</h2>
+            <p style="color: #666; margin-bottom: 0;">Manage projects for this organization</p>
+        </div>
+        {{if .CanMutate}}
+        <a href="/orgs/{{.OrgID}}/projects/new" style="background-color: #3498db; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none;">Create Project</a>
+        {{end}}
+    </div>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Projects}}
+    <div style="display: grid; gap: 1rem;">
+        {{range .Projects}}
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 1.5rem; background-color: #fafafa;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div>
+                    <h3 style="margin-bottom: 0.5rem; color: #2c3e50;">{{.Name}}</h3>
+                    <p style="color: #666; margin-bottom: 0.5rem;">Slug: <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.Slug}}</code></p>
+                    <p style="color: #666; margin-bottom: 0;">Default Branch: <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.DefaultBranch}}</code></p>
+                </div>
+                <a href="/orgs/{{$.OrgID}}/projects/{{.ID}}/settings" style="background-color: #95a5a6; color: white; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">Settings</a>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div style="text-align: center; padding: 3rem; color: #666;">
+        <p style="margin-bottom: 1rem;">No projects yet.</p>
+        {{if .CanMutate}}
+        <p>Create your first project to get started.</p>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}
