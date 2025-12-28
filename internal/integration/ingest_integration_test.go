@@ -95,6 +95,10 @@ func TestIntegration_IngestEndpointWritesRowsAndUpdatesFlakeStats(t *testing.T) 
 	require.Equal(t, 1, accepted2.FlakeEventsCreated)
 	require.Equal(t, 1, accepted2.Stored.TestResults)
 
+	accepted2Repeat := ingestJUnit(t, srv.URL, token, meta2, "flaky_attempt2.xml")
+	require.Equal(t, 0, accepted2Repeat.FlakeEventsCreated)
+	require.Equal(t, 0, accepted2Repeat.Stored.TestResults)
+
 	assertDBCounts(t, pool, map[string]int{
 		"test_cases":   1,
 		"test_results": 2,
