@@ -9,6 +9,7 @@ import (
 	"github.com/flakeguard/flakeguard/internal/audit"
 	"github.com/flakeguard/flakeguard/internal/auth"
 	"github.com/flakeguard/flakeguard/internal/validation"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
@@ -20,13 +21,18 @@ type CreateRequest struct {
 	Slug string `json:"slug"`
 }
 
-// OrgResponse represents an organization in API responses
-type OrgResponse struct {
+type OrgCreateResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
 	Slug      string    `json:"slug"`
-	Role      OrgRole   `json:"role,omitempty"`
 	CreatedAt string    `json:"created_at"`
+}
+
+type OrgListItemResponse struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+	Slug string    `json:"slug"`
+	Role OrgRole   `json:"role"`
 }
 
 // HandleCreate handles POST /api/v1/orgs
@@ -79,15 +85,16 @@ func HandleCreate(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 		}
 
 		// Return created organization
-		resp := OrgResponse{
+		resp := OrgCreateResponse{
 			ID:        org.ID,
 			Name:      org.Name,
 			Slug:      org.Slug,
-			Role:      RoleOwner,
 			CreatedAt: org.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusCreated, resp)
+		apperrors.WriteSuccess(w, r, http.StatusCreated, map[string]any{
+			"org": resp,
+		})
 	}
 }
 
@@ -107,18 +114,19 @@ func HandleList(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Convert to response format
-		resp := make([]OrgResponse, len(orgs))
+		resp := make([]OrgListItemResponse, len(orgs))
 		for i, org := range orgs {
-			resp[i] = OrgResponse{
-				ID:        org.ID,
-				Name:      org.Name,
-				Slug:      org.Slug,
-				Role:      org.Role,
-				CreatedAt: org.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			resp[i] = OrgListItemResponse{
+				ID:   org.ID,
+				Name: org.Name,
+				Slug: org.Slug,
+				Role: org.Role,
 			}
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusOK, resp)
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"orgs": resp,
+		})
 	}
 }
 
@@ -129,7 +137,7 @@ func HandleListMembers(pool *pgxpool.Pool) http.HandlerFunc {
 		userID := auth.GetUserID(ctx)
 
 		// Get org ID from path
-		orgIDStr := r.PathValue("org_id")
+		orgIDStr := chi.URLParam(r, "org_id")
 		orgID, err := uuid.Parse(orgIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid organization ID")
@@ -158,6 +166,8 @@ func HandleListMembers(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusOK, members)
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"members": members,
+		})
 	}
 }

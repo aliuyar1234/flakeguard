@@ -35,7 +35,7 @@ func (s *Service) GetByID(ctx context.Context, apiKeyID uuid.UUID) (*ApiKey, err
 	var key ApiKey
 
 	query := `
-		SELECT id, project_id, name, token_hash, scopes, revoked_at, last_used_at,
+		SELECT id, project_id, name, token_hash, scopes::text[], revoked_at, last_used_at,
 		       created_by_user_id, created_at, updated_at
 		FROM api_keys
 		WHERE id = $1
@@ -67,7 +67,7 @@ func (s *Service) GetByID(ctx context.Context, apiKeyID uuid.UUID) (*ApiKey, err
 // ListByProject retrieves all API keys for a project
 func (s *Service) ListByProject(ctx context.Context, projectID uuid.UUID) ([]ApiKey, error) {
 	query := `
-		SELECT id, project_id, name, token_hash, scopes, revoked_at, last_used_at,
+		SELECT id, project_id, name, token_hash, scopes::text[], revoked_at, last_used_at,
 		       created_by_user_id, created_at, updated_at
 		FROM api_keys
 		WHERE project_id = $1
@@ -126,8 +126,8 @@ func (s *Service) Create(ctx context.Context, projectID uuid.UUID, name string, 
 	var key ApiKey
 	query := `
 		INSERT INTO api_keys (project_id, name, token_hash, scopes, created_by_user_id)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, project_id, name, token_hash, scopes, revoked_at, last_used_at,
+		VALUES ($1, $2, $3, $4::api_key_scope[], $5)
+		RETURNING id, project_id, name, token_hash, scopes::text[], revoked_at, last_used_at,
 		          created_by_user_id, created_at, updated_at
 	`
 
@@ -181,7 +181,7 @@ func (s *Service) GetByTokenHash(ctx context.Context, tokenHash []byte) (*ApiKey
 	var key ApiKey
 
 	query := `
-		SELECT id, project_id, name, token_hash, scopes, revoked_at, last_used_at,
+		SELECT id, project_id, name, token_hash, scopes::text[], revoked_at, last_used_at,
 		       created_by_user_id, created_at, updated_at
 		FROM api_keys
 		WHERE token_hash = $1

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="FlakySuite" tests="1" failures="0" errors="0" skipped="0" time="0.010">
+    <testcase classname="com.example.FlakyTest" name="testFlaky" time="0.010"/>
+  </testsuite>
+</testsuites>

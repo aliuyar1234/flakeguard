@@ -1,276 +1,66 @@
-# FlakeGuard API Documentation
+# FlakeGuard API (MVP)
 
-REST API for programmatic access to FlakeGuard.
+This document summarizes the integration endpoints and response envelopes.
 
-## Authentication
+## Auth
 
-All API requests require authentication using an API key.
+- **CI/agents**: `Authorization: Bearer <project_api_key>` (scope `ingest:write`)
+- **Dashboard users**: session cookie via `/api/v1/auth/*` (JSON-only endpoints)
 
-### Bearer Token Authentication
+## Response Envelopes
 
-Include your API key in the `Authorization` header:
+Success:
 
+```json
+{ "request_id": "req_01H...", "data": { } }
 ```
-Authorization: Bearer <your-api-key>
+
+Error:
+
+```json
+{ "error": { "code": "invalid_meta", "message": "meta.branch is required", "request_id": "req_01H..." } }
 ```
 
-### Getting an API Key
+## Ingestion
 
-1. Log in to FlakeGuard dashboard
-2. Navigate to your project settings
-3. Click "API Keys" tab
-4. Click "Create API Key"
-5. Copy the key (it will only be shown once)
-6. Store it securely (e.g., GitHub Secrets)
+### POST `/api/v1/ingest/junit`
 
-## Endpoints
+Auth: Bearer API key (`ingest:write`)
 
-### POST /api/v1/ingest/junit
+Content-Type: `multipart/form-data`
 
-Upload JUnit XML test results for flake detection.
+- `meta` (application/json, required)
+- `junit` (file, required; may be repeated)
 
-**Authentication**: Required (API key)
-
-**Request**: `multipart/form-data`
-
-**Form Parameters**:
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `project_slug` | string | Yes | Project identifier from FlakeGuard dashboard |
-| `files` | file[] | Yes | One or more JUnit XML files (max 1MB each, 5MB total) |
-| `repository` | string | No | Repository name (e.g., `owner/repo`) |
-| `commit_sha` | string | No | Git commit SHA |
-| `branch` | string | No | Git branch name |
-| `run_id` | string | No | CI run identifier |
-| `run_attempt` | string | No | CI run attempt number (for retries) |
-| `workflow_name` | string | No | CI workflow name |
-| `job_name` | string | No | CI job name |
-| `job_variant` | string | No | Job variant identifier (e.g., `python-3.9`, `ubuntu-latest`) |
-
-**Response**: `200 OK`
+Response: `202 Accepted`
 
 ```json
 {
-  "files_ingested": 3,
-  "tests_total": 142,
-  "tests_passed": 140,
-  "tests_failed": 2,
-  "tests_skipped": 0,
-  "flakes_detected": 1,
-  "message": "Ingested 3 JUnit files with 142 tests"
-}
-```
-
-**Error Responses**:
-
-- `400 Bad Request`: Invalid request (missing fields, invalid XML)
-  ```json
-  {
-    "error": "project_slug is required"
-  }
-  ```
-
-- `401 Unauthorized`: Invalid or missing API key
-  ```json
-  {
-    "error": "Invalid API key"
-  }
-  ```
-
-- `404 Not Found`: Project not found
-  ```json
-  {
-    "error": "Project not found: my-project"
-  }
-  ```
-
-- `413 Payload Too Large`: Upload exceeds size limits
-  ```json
-  {
-    "error": "Total upload size exceeds limit (5MB)"
-  }
-  ```
-
-- `429 Too Many Requests`: Rate limit exceeded
-  ```json
-  {
-    "error": "Rate limit exceeded. Try again in 60 seconds."
-  }
-  ```
-
-**Example with curl**:
-
-```bash
-curl -X POST https://flakeguard.example.com/api/v1/ingest/junit \
-  -H "Authorization: Bearer your-api-key-here" \
-  -F "project_slug=my-project" \
-  -F "repository=owner/repo" \
-  -F "commit_sha=abc123def456" \
-  -F "branch=main" \
-  -F "files=@test-results/junit.xml" \
-  -F "files=@test-results/integration.xml"
-```
-
-### GET /api/v1/projects/{id}/flakes
-
-Retrieve flaky tests for a project.
-
-**Authentication**: Required (API key)
-
-**Path Parameters**:
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `id` | integer | Project ID from FlakeGuard dashboard |
-
-**Query Parameters**:
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `status` | string | `active` | Filter by status: `active`, `resolved`, `all` |
-| `min_flake_rate` | float | `0.0` | Minimum flake rate (0.0-1.0) |
-| `limit` | integer | `50` | Maximum results to return (1-1000) |
-| `offset` | integer | `0` | Pagination offset |
-
-**Response**: `200 OK`
-
-```json
-{
-  "flakes": [
-    {
-      "id": 123,
-      "test_name": "test_user_login",
-      "test_class": "UserAuthTests",
-      "test_file": "tests/auth/test_user.py",
-      "flake_rate": 0.15,
-      "total_runs": 100,
-      "flake_count": 15,
-      "first_seen": "2024-01-15T10:30:00Z",
-      "last_seen": "2024-01-20T14:45:00Z",
-      "status": "active",
-      "patterns": [
-        "Intermittent timeout connecting to database",
-        "Race condition in user session creation"
-      ]
-    }
-  ],
-  "total": 1,
-  "limit": 50,
-  "offset": 0
-}
-```
-
-**Error Responses**:
-
-- `401 Unauthorized`: Invalid or missing API key
-- `403 Forbidden`: API key does not have access to this project
-- `404 Not Found`: Project not found
-
-**Example with curl**:
-
-```bash
-# Get all active flakes
-curl https://flakeguard.example.com/api/v1/projects/42/flakes \
-  -H "Authorization: Bearer your-api-key-here"
-
-# Get flakes with rate >= 10%
-curl "https://flakeguard.example.com/api/v1/projects/42/flakes?min_flake_rate=0.1" \
-  -H "Authorization: Bearer your-api-key-here"
-
-# Get all flakes (active and resolved)
-curl "https://flakeguard.example.com/api/v1/projects/42/flakes?status=all" \
-  -H "Authorization: Bearer your-api-key-here"
-
-# Pagination
-curl "https://flakeguard.example.com/api/v1/projects/42/flakes?limit=20&offset=40" \
-  -H "Authorization: Bearer your-api-key-here"
-```
-
-## Rate Limits
-
-Default rate limit: **120 requests per minute** per API key.
-
-Rate limit headers included in all responses:
-
-```
-X-RateLimit-Limit: 120
-X-RateLimit-Remaining: 115
-X-RateLimit-Reset: 1642345678
-```
-
-When rate limited, retry after the time indicated in `X-RateLimit-Reset` (Unix timestamp).
-
-## Error Handling
-
-All error responses follow this format:
-
-```json
-{
-  "error": "Human-readable error message",
-  "code": "ERROR_CODE",
-  "details": {
-    "field": "Additional context"
+  "request_id": "req_01H...",
+  "data": {
+    "ingestion_id": "7a2f0df1-bac9-4d3e-9b2d-4a2a1f2d0eaa",
+    "stored": { "junit_files": 2, "test_results": 842 },
+    "flake_events_created": 1
   }
 }
 ```
 
-Common HTTP status codes:
+## Dashboard (Read)
 
-- `200 OK`: Request succeeded
-- `400 Bad Request`: Invalid request parameters
-- `401 Unauthorized`: Missing or invalid API key
-- `403 Forbidden`: API key lacks permission
-- `404 Not Found`: Resource not found
-- `413 Payload Too Large`: Upload too large
-- `429 Too Many Requests`: Rate limit exceeded
-- `500 Internal Server Error`: Server error (contact support)
+### GET `/api/v1/projects/{project_id}/flakes`
 
-## Testing the API
+Query params:
 
-### Test JUnit Upload
+- `days` (int)
+- `repo` (string)
+- `job_name` (string)
 
-```bash
-# Create a test JUnit file
-cat > test-junit.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuites>
-  <testsuite name="ExampleTests" tests="2" failures="0" errors="0">
-    <testcase name="test_example_1" classname="ExampleTests" time="0.123"/>
-    <testcase name="test_example_2" classname="ExampleTests" time="0.456"/>
-  </testsuite>
-</testsuites>
-EOF
+Response: `200 OK` with `data.flakes[]`.
 
-# Upload to FlakeGuard
-curl -X POST https://flakeguard.example.com/api/v1/ingest/junit \
-  -H "Authorization: Bearer your-api-key-here" \
-  -F "project_slug=my-project" \
-  -F "files=@test-junit.xml" \
-  -F "branch=test-branch" \
-  -F "commit_sha=test123"
-```
+### GET `/api/v1/projects/{project_id}/flakes/{test_case_id}`
 
-### Test Flake Retrieval
+Query params:
 
-```bash
-# Get flakes for project ID 42
-curl https://flakeguard.example.com/api/v1/projects/42/flakes \
-  -H "Authorization: Bearer your-api-key-here" \
-  | jq .
-```
+- `days` (int)
 
-## SDK and Libraries
-
-Currently, FlakeGuard provides:
-
-- **GitHub Action**: Automated JUnit upload from GitHub Actions workflows
-- **REST API**: Direct API access for custom integrations
-
-Community SDKs are welcome! See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
-
-## Support
-
-- Documentation: [docs/](.)
-- GitHub Issues: Report bugs and request features
-- Runbook: [docs/runbook.md](./runbook.md) for operational guidance
+Response: `200 OK` with `data.flake` and `data.flake.evidence[]`.

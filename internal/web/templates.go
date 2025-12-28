@@ -11,12 +11,13 @@ import (
 
 // TemplateData holds common data passed to all templates
 type TemplateData struct {
-	Title     string
-	UserID    uuid.UUID
-	CSRFToken string
-	Error     string
-	Success   string
-	Data      interface{}
+	Title           string
+	UserID          uuid.UUID
+	IsAuthenticated bool
+	CSRFToken       string
+	Error           string
+	Success         string
+	Data            interface{}
 }
 
 // templates is the global template cache

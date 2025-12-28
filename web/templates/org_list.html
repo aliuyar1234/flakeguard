@@ -1,8 +1,8 @@
 {{define "content"}}
 <div>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-        <h2 style="margin-bottom: 0;">Organizations</h2>
-        <a href="/orgs/new" style="background-color: #3498db; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none;">Create Organization</a>
+    <div class="page-header mb-2">
+        <h2 class="mb-0">Organizations</h2>
+        <a href="/orgs/new" class="btn btn-primary">Create Organization</a>
     </div>
 
     {{if .Error}}
@@ -10,24 +10,26 @@
     {{end}}
 
     {{if .Data.Orgs}}
-    <div style="display: grid; gap: 1rem;">
+    <div class="card-grid">
         {{range .Data.Orgs}}
-        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 1.5rem; background-color: #fafafa;">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
+        <div class="card">
+            <div class="card-row">
                 <div>
-                    <h3 style="margin-bottom: 0.5rem; color: #2c3e50;">{{.Name}}</h3>
-                    <p style="color: #666; margin-bottom: 0.5rem;">Slug: <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.Slug}}</code></p>
-                    <p style="color: #666; margin-bottom: 0;">Role: <strong>{{.Role}}</strong></p>
+                    <h3 class="mb-1">{{.Name}}</h3>
+                    <div class="text-muted mb-1">Slug: <span class="code-pill">{{.Slug}}</span></div>
+                    <div class="text-muted">Role: <strong>{{.Role}}</strong></div>
                 </div>
-                <a href="/orgs/{{.ID}}/projects" style="background-color: #2ecc71; color: white; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">View Projects</a>
+                <div>
+                    <a href="/orgs/{{.ID}}/projects" class="btn btn-success btn-sm">View Projects</a>
+                </div>
             </div>
         </div>
         {{end}}
     </div>
     {{else}}
-    <div style="text-align: center; padding: 3rem; color: #666;">
-        <p style="margin-bottom: 1rem;">You don't have any organizations yet.</p>
-        <p>Create your first organization to get started.</p>
+    <div class="empty-state">
+        <p class="mb-1">You don't have any organizations yet.</p>
+        <p class="mb-0">Create your first organization to get started.</p>
     </div>
     {{end}}
 </div>

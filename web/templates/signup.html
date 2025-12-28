@@ -1,12 +1,12 @@
 {{define "content"}}
-<div style="max-width: 400px; margin: 0 auto;">
+<div class="auth-container">
     <h2>Sign Up</h2>
 
     {{if .Error}}
     <div class="error">{{.Error}}</div>
     {{end}}
 
-    <form method="POST" action="/api/v1/auth/signup">
+    <form method="POST" action="/api/v1/auth/signup" data-json-form data-redirect="/login">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
         <div class="form-group">
@@ -17,10 +17,12 @@
         <div class="form-group">
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
-            <small style="color: #666; display: block; margin-top: 0.25rem;">Minimum 8 characters</small>
+            <small class="helper-text">Minimum 8 characters</small>
         </div>
 
-        <button type="submit">Create Account</button>
+        <div class="button-row">
+            <button type="submit" class="btn btn-primary">Create Account</button>
+        </div>
 
         <div class="text-center mt-1">
             <a href="/login" class="link">Already have an account? Log in</a>

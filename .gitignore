@@ -29,12 +29,25 @@ Thumbs.db
 
 # Internal development documentation
 specs/
+SSOT.md
+FlakeGuard Spec.md
 .claude/
 .specify/
 CLAUDE.md
-"FlakeGuard Spec.md"
 MILESTONE-*.md
 thoughts/
+docs/specs-task-status.md
+docs/internal/
+docs/_internal/
+docs/private/
+
+# AI assistant artifacts
+.codex/
+.chatgpt/
+.openai/
+*chatgpt*.md
+*claude*.md
+*codex*.md
 
 # Temporary files
 *.tmp

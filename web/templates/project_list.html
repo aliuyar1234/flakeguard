@@ -1,16 +1,16 @@
 {{define "content"}}
 <div>
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/orgs" style="color: #3498db; text-decoration: none;">&larr; Back to Organizations</a>
+    <div class="mb-1">
+        <a href="/orgs" class="link">&larr; Back to Organizations</a>
     </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <div class="page-header mb-2">
         <div>
-            <h2 style="margin-bottom: 0.5rem;">{{.OrgName}} Projects</h2>
-            <p style="color: #666; margin-bottom: 0;">Manage projects for this organization</p>
+            <h2 class="mb-1">{{.Data.OrgName}} Projects</h2>
+            <p class="text-muted mb-0">Manage projects for this organization</p>
         </div>
-        {{if .CanMutate}}
-        <a href="/orgs/{{.OrgID}}/projects/new" style="background-color: #3498db; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none;">Create Project</a>
+        {{if .Data.CanMutate}}
+        <a href="/orgs/{{.Data.OrgID}}/projects/new" class="btn btn-primary">Create Project</a>
         {{end}}
     </div>
 
@@ -18,26 +18,28 @@
     <div class="error">{{.Error}}</div>
     {{end}}
 
-    {{if .Projects}}
-    <div style="display: grid; gap: 1rem;">
-        {{range .Projects}}
-        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 1.5rem; background-color: #fafafa;">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
+    {{if .Data.Projects}}
+    <div class="card-grid">
+        {{range .Data.Projects}}
+        <div class="card">
+            <div class="card-row">
                 <div>
-                    <h3 style="margin-bottom: 0.5rem; color: #2c3e50;">{{.Name}}</h3>
-                    <p style="color: #666; margin-bottom: 0.5rem;">Slug: <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.Slug}}</code></p>
-                    <p style="color: #666; margin-bottom: 0;">Default Branch: <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.DefaultBranch}}</code></p>
+                    <h3 class="mb-1">{{.Name}}</h3>
+                    <div class="text-muted mb-1">Slug: <span class="code-pill">{{.Slug}}</span></div>
+                    <div class="text-muted">Default branch: <span class="code-pill">{{.DefaultBranch}}</span></div>
                 </div>
-                <a href="/orgs/{{$.OrgID}}/projects/{{.ID}}/settings" style="background-color: #95a5a6; color: white; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">Settings</a>
+                <div>
+                    <a href="/orgs/{{$.Data.OrgID}}/projects/{{.ID}}/settings" class="btn btn-muted btn-sm">Settings</a>
+                </div>
             </div>
         </div>
         {{end}}
     </div>
     {{else}}
-    <div style="text-align: center; padding: 3rem; color: #666;">
-        <p style="margin-bottom: 1rem;">No projects yet.</p>
-        {{if .CanMutate}}
-        <p>Create your first project to get started.</p>
+    <div class="empty-state">
+        <p class="mb-1">No projects yet.</p>
+        {{if .Data.CanMutate}}
+        <p class="mb-0">Create your first project to get started.</p>
         {{end}}
     </div>
     {{end}}

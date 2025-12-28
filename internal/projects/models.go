@@ -25,10 +25,12 @@ type Project struct {
 // This is used for API requests/responses
 type SlackConfig struct {
 	WebhookURL string `json:"webhook_url"`
+	Enabled    bool   `json:"enabled"`
 }
 
 // SlackStatus represents the Slack configuration status without exposing the URL
 type SlackStatus struct {
+	Enabled       bool `json:"enabled"`
 	WebhookURLSet bool `json:"webhook_url_set"`
 }
 

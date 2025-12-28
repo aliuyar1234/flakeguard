@@ -10,6 +10,7 @@ import (
 	"github.com/flakeguard/flakeguard/internal/auth"
 	"github.com/flakeguard/flakeguard/internal/orgs"
 	"github.com/flakeguard/flakeguard/internal/validation"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
@@ -22,15 +23,20 @@ type CreateRequest struct {
 	DefaultBranch string `json:"default_branch"`
 }
 
-// ProjectResponse represents a project in API responses
-type ProjectResponse struct {
-	ID            uuid.UUID    `json:"id"`
-	OrgID         uuid.UUID    `json:"org_id"`
-	Name          string       `json:"name"`
-	Slug          string       `json:"slug"`
-	DefaultBranch string       `json:"default_branch"`
-	Slack         *SlackStatus `json:"slack,omitempty"`
-	CreatedAt     string       `json:"created_at"`
+type ProjectCreateResponse struct {
+	ID            uuid.UUID `json:"id"`
+	OrgID         uuid.UUID `json:"org_id"`
+	Name          string    `json:"name"`
+	Slug          string    `json:"slug"`
+	DefaultBranch string    `json:"default_branch"`
+	CreatedAt     string    `json:"created_at"`
+}
+
+type ProjectListItemResponse struct {
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	Slug          string    `json:"slug"`
+	DefaultBranch string    `json:"default_branch"`
 }
 
 // HandleCreate handles POST /api/v1/orgs/{org_id}/projects
@@ -40,7 +46,7 @@ func HandleCreate(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 		userID := auth.GetUserID(ctx)
 
 		// Get org ID from path
-		orgIDStr := r.PathValue("org_id")
+		orgIDStr := chi.URLParam(r, "org_id")
 		orgID, err := uuid.Parse(orgIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid organization ID")
@@ -113,19 +119,18 @@ func HandleCreate(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 		}
 
 		// Return created project
-		resp := ProjectResponse{
+		resp := ProjectCreateResponse{
 			ID:            project.ID,
 			OrgID:         project.OrgID,
 			Name:          project.Name,
 			Slug:          project.Slug,
 			DefaultBranch: project.DefaultBranch,
-			Slack: &SlackStatus{
-				WebhookURLSet: project.HasSlackConfigured(),
-			},
-			CreatedAt: project.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt:     project.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusCreated, resp)
+		apperrors.WriteSuccess(w, r, http.StatusCreated, map[string]any{
+			"project": resp,
+		})
 	}
 }
 
@@ -136,7 +141,7 @@ func HandleList(pool *pgxpool.Pool) http.HandlerFunc {
 		userID := auth.GetUserID(ctx)
 
 		// Get org ID from path
-		orgIDStr := r.PathValue("org_id")
+		orgIDStr := chi.URLParam(r, "org_id")
 		orgID, err := uuid.Parse(orgIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid organization ID")
@@ -166,28 +171,26 @@ func HandleList(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Convert to response format
-		resp := make([]ProjectResponse, len(projects))
+		resp := make([]ProjectListItemResponse, len(projects))
 		for i, project := range projects {
-			resp[i] = ProjectResponse{
+			resp[i] = ProjectListItemResponse{
 				ID:            project.ID,
-				OrgID:         project.OrgID,
 				Name:          project.Name,
 				Slug:          project.Slug,
 				DefaultBranch: project.DefaultBranch,
-				Slack: &SlackStatus{
-					WebhookURLSet: project.HasSlackConfigured(),
-				},
-				CreatedAt: project.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			}
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusOK, resp)
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"projects": resp,
+		})
 	}
 }
 
 // SlackConfigRequest represents the request to configure Slack
 type SlackConfigRequest struct {
 	WebhookURL string `json:"webhook_url"`
+	Enabled    *bool  `json:"enabled"`
 }
 
 // HandleConfigureSlack handles PUT /api/v1/projects/{project_id}/slack
@@ -197,7 +200,7 @@ func HandleConfigureSlack(pool *pgxpool.Pool, auditor *audit.Writer) http.Handle
 		userID := auth.GetUserID(ctx)
 
 		// Get project ID from path
-		projectIDStr := r.PathValue("project_id")
+		projectIDStr := chi.URLParam(r, "project_id")
 		projectID, err := uuid.Parse(projectIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid project ID")
@@ -241,6 +244,11 @@ func HandleConfigureSlack(pool *pgxpool.Pool, auditor *audit.Writer) http.Handle
 			return
 		}
 
+		if req.Enabled == nil {
+			apperrors.WriteBadRequest(w, r, "enabled is required")
+			return
+		}
+
 		// Validate webhook URL
 		if err := validation.ValidateWebhookURL(req.WebhookURL); err != nil {
 			apperrors.WriteBadRequest(w, r, err.Error())
@@ -248,8 +256,13 @@ func HandleConfigureSlack(pool *pgxpool.Pool, auditor *audit.Writer) http.Handle
 		}
 
 		// Configure Slack
-		if err := service.ConfigureSlack(ctx, projectID, req.WebhookURL); err != nil {
+		status, err := service.ConfigureSlack(ctx, projectID, req.WebhookURL, *req.Enabled)
+		if err != nil {
 			log.Error().Err(err).Msg("Failed to configure Slack")
+			if errors.Is(err, ErrProjectNotFound) {
+				apperrors.WriteNotFound(w, r, "Project not found")
+				return
+			}
 			apperrors.WriteInternalError(w, r, "Failed to configure Slack")
 			return
 		}
@@ -261,8 +274,8 @@ func HandleConfigureSlack(pool *pgxpool.Pool, auditor *audit.Writer) http.Handle
 		}
 
 		// Return status (without webhook URL)
-		apperrors.WriteSuccess(w, r, http.StatusOK, SlackStatus{
-			WebhookURLSet: true,
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"slack": status,
 		})
 	}
 }
@@ -274,7 +287,7 @@ func HandleRemoveSlack(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFu
 		userID := auth.GetUserID(ctx)
 
 		// Get project ID from path
-		projectIDStr := r.PathValue("project_id")
+		projectIDStr := chi.URLParam(r, "project_id")
 		projectID, err := uuid.Parse(projectIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid project ID")
@@ -325,8 +338,11 @@ func HandleRemoveSlack(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFu
 		}
 
 		// Return status
-		apperrors.WriteSuccess(w, r, http.StatusOK, SlackStatus{
-			WebhookURLSet: false,
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"slack": SlackStatus{
+				Enabled:       false,
+				WebhookURLSet: false,
+			},
 		})
 	}
 }

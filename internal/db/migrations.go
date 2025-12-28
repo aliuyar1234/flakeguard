@@ -110,23 +110,19 @@ func applyMigration(ctx context.Context, pool *pgxpool.Pool, migration string) e
 		return err
 	}
 
-	// Begin transaction
-	tx, err := pool.Begin(ctx)
+	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer conn.Release()
 
-	// Execute migration SQL
-	if _, err := tx.Exec(ctx, string(content)); err != nil {
+	// Use the simple query protocol to execute multi-statement SQL migrations.
+	_, err = conn.Conn().PgConn().Exec(ctx, string(content)).ReadAll()
+	if err != nil {
 		return err
 	}
 
 	// Record migration as applied
-	if _, err := tx.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", migration); err != nil {
-		return err
-	}
-
-	// Commit transaction
-	return tx.Commit(ctx)
+	_, err = pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ($1)", migration)
+	return err
 }

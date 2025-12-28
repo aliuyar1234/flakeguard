@@ -10,6 +10,7 @@ import (
 	"github.com/flakeguard/flakeguard/internal/auth"
 	"github.com/flakeguard/flakeguard/internal/orgs"
 	"github.com/flakeguard/flakeguard/internal/projects"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
@@ -28,7 +29,7 @@ func HandleCreate(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 		userID := auth.GetUserID(ctx)
 
 		// Get project ID from path
-		projectIDStr := r.PathValue("project_id")
+		projectIDStr := chi.URLParam(r, "project_id")
 		projectID, err := uuid.Parse(projectIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid project ID")
@@ -103,12 +104,9 @@ func HandleCreate(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 		}
 
 		// Return created API key with plaintext token
-		resp := ApiKeyWithToken{
-			ApiKeyResponse: key.ToResponse(),
-			Token:          token,
-		}
-
-		apperrors.WriteSuccess(w, r, http.StatusCreated, resp)
+		apperrors.WriteSuccess(w, r, http.StatusCreated, map[string]any{
+			"api_key": key.ToCreatedResponse(token),
+		})
 	}
 }
 
@@ -119,7 +117,7 @@ func HandleList(pool *pgxpool.Pool) http.HandlerFunc {
 		userID := auth.GetUserID(ctx)
 
 		// Get project ID from path
-		projectIDStr := r.PathValue("project_id")
+		projectIDStr := chi.URLParam(r, "project_id")
 		projectID, err := uuid.Parse(projectIDStr)
 		if err != nil {
 			apperrors.WriteBadRequest(w, r, "Invalid project ID")
@@ -162,12 +160,14 @@ func HandleList(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		// Convert to response format (without token hashes)
-		resp := make([]ApiKeyResponse, len(keys))
+		resp := make([]ApiKeyListItemResponse, len(keys))
 		for i, key := range keys {
-			resp[i] = key.ToResponse()
+			resp[i] = key.ToListItemResponse()
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusOK, resp)
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"api_keys": resp,
+		})
 	}
 }
 
@@ -178,8 +178,8 @@ func HandleRevoke(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 		userID := auth.GetUserID(ctx)
 
 		// Get IDs from path
-		projectIDStr := r.PathValue("project_id")
-		apiKeyIDStr := r.PathValue("api_key_id")
+		projectIDStr := chi.URLParam(r, "project_id")
+		apiKeyIDStr := chi.URLParam(r, "api_key_id")
 
 		projectID, err := uuid.Parse(projectIDStr)
 		if err != nil {
@@ -259,8 +259,8 @@ func HandleRevoke(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 			// Continue - don't fail the request
 		}
 
-		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]string{
-			"message": "API key revoked successfully",
+		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
+			"revoked": true,
 		})
 	}
 }

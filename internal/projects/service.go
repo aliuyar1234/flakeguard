@@ -213,23 +213,34 @@ func (s *Service) Create(ctx context.Context, orgID uuid.UUID, name, slug, defau
 }
 
 // ConfigureSlack configures Slack webhook for a project
-func (s *Service) ConfigureSlack(ctx context.Context, projectID uuid.UUID, webhookURL string) error {
+func (s *Service) ConfigureSlack(ctx context.Context, projectID uuid.UUID, webhookURL string, enabled bool) (*SlackStatus, error) {
+	var storedWebhookURL sql.NullString
+	var slackEnabled bool
+
 	query := `
 		UPDATE projects
-		SET slack_enabled = TRUE, slack_webhook_url = $2, updated_at = NOW()
+		SET slack_enabled = $2,
+		    slack_webhook_url = CASE
+		        WHEN NULLIF($3, '') IS NULL THEN slack_webhook_url
+		        ELSE $3
+		    END,
+		    updated_at = NOW()
 		WHERE id = $1
+		RETURNING slack_enabled, slack_webhook_url
 	`
 
-	result, err := s.pool.Exec(ctx, query, projectID, webhookURL)
+	err := s.pool.QueryRow(ctx, query, projectID, enabled, webhookURL).Scan(&slackEnabled, &storedWebhookURL)
 	if err != nil {
-		return fmt.Errorf("failed to configure Slack: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrProjectNotFound
+		}
+		return nil, fmt.Errorf("failed to configure Slack: %w", err)
 	}
 
-	if result.RowsAffected() == 0 {
-		return ErrProjectNotFound
-	}
-
-	return nil
+	return &SlackStatus{
+		Enabled:       slackEnabled,
+		WebhookURLSet: storedWebhookURL.Valid && storedWebhookURL.String != "",
+	}, nil
 }
 
 // RemoveSlack removes Slack webhook configuration from a project

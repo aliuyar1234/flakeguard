@@ -4,33 +4,16 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/google/uuid"
+	"github.com/flakeguard/flakeguard/internal/apperrors"
 )
 
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
-
-const requestIDKey contextKey = "request_id"
-
-// RequestIDMiddleware adds a unique request ID to each request
+// RequestIDMiddleware adds a unique request ID to each request.
+// Wrapper around internal/apperrors to satisfy SSOT repository structure.
 func RequestIDMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Generate a new UUID for this request
-		requestID := uuid.New().String()
-
-		// Add request ID to context
-		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
-
-		// Continue with updated context
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	return apperrors.RequestIDMiddleware(next)
 }
 
-// GetRequestID retrieves the request ID from the context
-// Returns empty string if not found
+// GetRequestID retrieves the request ID from the context.
 func GetRequestID(ctx context.Context) string {
-	if requestID, ok := ctx.Value(requestIDKey).(string); ok {
-		return requestID
-	}
-	return ""
+	return apperrors.GetRequestID(ctx)
 }

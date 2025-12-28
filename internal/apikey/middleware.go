@@ -1,12 +1,13 @@
 package apikey
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/apperrors"
 	"github.com/flakeguard/flakeguard/internal/apikeys"
+	"github.com/flakeguard/flakeguard/internal/apperrors"
 	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
@@ -22,19 +23,19 @@ func RequireAPIKey(pool *pgxpool.Pool, requiredScope apikeys.ApiKeyScope) func(h
 			// Extract API key from Authorization header
 			token, err := ExtractAPIKey(r)
 			if err != nil {
-				apperrors.WriteUnauthorized(w, r, "Invalid or missing API key")
+				if errors.Is(err, ErrMissingAPIKey) {
+					apperrors.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "Missing Authorization header")
+					return
+				}
+				apperrors.WriteError(w, r, http.StatusUnauthorized, "unauthorized", "Invalid Authorization header")
 				return
 			}
 
 			// Validate API key
 			key, err := ValidateAPIKey(ctx, pool, token)
 			if err != nil {
-				if err == ErrInvalidAPIKey {
-					apperrors.WriteUnauthorized(w, r, "Invalid API key")
-					return
-				}
-				if err == ErrRevokedAPIKey {
-					apperrors.WriteUnauthorized(w, r, "API key has been revoked")
+				if err == ErrInvalidAPIKey || err == ErrRevokedAPIKey {
+					apperrors.WriteError(w, r, http.StatusUnauthorized, "invalid_api_key", "Invalid API key")
 					return
 				}
 				log.Error().Err(err).Msg("Failed to validate API key")
@@ -44,7 +45,7 @@ func RequireAPIKey(pool *pgxpool.Pool, requiredScope apikeys.ApiKeyScope) func(h
 
 			// Validate scope
 			if err := ValidateScope(key, requiredScope); err != nil {
-				apperrors.WriteForbidden(w, r, "API key does not have required scope")
+				apperrors.WriteError(w, r, http.StatusForbidden, "forbidden", fmt.Sprintf("API key missing required scope: %s", requiredScope))
 				return
 			}
 
@@ -93,7 +94,7 @@ func RateLimitByAPIKey(requestsPerMinute int) func(http.Handler) http.Handler {
 
 			// Set Retry-After header (60 seconds = 1 minute)
 			w.Header().Set("Retry-After", "60")
-			apperrors.WriteTooManyRequests(w, r, "Rate limit exceeded. Please retry after 60 seconds.")
+			apperrors.WriteError(w, r, http.StatusTooManyRequests, "rate_limit_exceeded", "Rate limit exceeded. Please retry after 60 seconds.")
 		}),
 	)
 }

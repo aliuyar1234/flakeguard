@@ -1,13 +1,17 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/mail"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/flakeguard/flakeguard/internal/apperrors"
+	"github.com/flakeguard/flakeguard/internal/audit"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -15,245 +19,220 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// ErrorResponse represents the error envelope
-type ErrorResponse struct {
-	Error ErrorDetail `json:"error"`
-}
-
-// ErrorDetail contains error information
-type ErrorDetail struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-// SuccessResponse represents the success envelope
-type SuccessResponse struct {
-	Data interface{} `json:"data"`
-}
-
-// writeError writes a JSON error response
-func writeError(w http.ResponseWriter, statusCode int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(ErrorResponse{
-		Error: ErrorDetail{
-			Code:    code,
-			Message: message,
-		},
-	})
-}
-
-// writeSuccess writes a JSON success response
-func writeSuccess(w http.ResponseWriter, statusCode int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(SuccessResponse{
-		Data: data,
-	})
-}
-
-// SignupRequest represents the signup request payload
-type SignupRequest struct {
+type signupRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// SignupResponse represents the signup response
-type SignupResponse struct {
-	UserID uuid.UUID `json:"user_id"`
-	Email  string    `json:"email"`
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
-// HandleSignup processes user registration
-func HandleSignup(pool *pgxpool.Pool, jwtSecret string, sessionDays int, isProduction bool) http.HandlerFunc {
+type userCreated struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt string    `json:"created_at"`
+}
+
+type userSummary struct {
+	ID    uuid.UUID `json:"id"`
+	Email string    `json:"email"`
+}
+
+type signupResponse struct {
+	User userCreated `json:"user"`
+}
+
+type loginResponse struct {
+	User userSummary `json:"user"`
+}
+
+type logoutResponse struct {
+	LoggedOut bool `json:"logged_out"`
+}
+
+type loginFailureLimiter struct {
+	mu   sync.Mutex
+	last map[string]time.Time
+}
+
+func (l *loginFailureLimiter) Allow(key string, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.last == nil {
+		l.last = make(map[string]time.Time)
+	}
+
+	const window = time.Minute
+	if last, ok := l.last[key]; ok && now.Sub(last) < window {
+		return false
+	}
+	l.last[key] = now
+	return true
+}
+
+var loginFailedAuditLimiter loginFailureLimiter
+
+// HandleSignup processes POST /api/v1/auth/signup.
+func HandleSignup(pool *pgxpool.Pool, auditor *audit.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse form data
-		if err := r.ParseForm(); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "Invalid form data")
+		var req signupRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			apperrors.WriteError(w, r, http.StatusBadRequest, "bad_request", "Invalid request body")
 			return
 		}
 
-		email := strings.TrimSpace(r.FormValue("email"))
-		password := r.FormValue("password")
+		email := strings.TrimSpace(req.Email)
+		password := req.Password
 
-		// Validate email format (RFC 5322 simplified)
 		if !isValidEmail(email) {
-			writeError(w, http.StatusBadRequest, "bad_request", "Invalid email address")
+			apperrors.WriteError(w, r, http.StatusBadRequest, "invalid_email", "Email format is invalid")
 			return
 		}
-
-		// Validate password length (minimum 8 characters)
 		if len(password) < 8 {
-			writeError(w, http.StatusBadRequest, "bad_request", "Password must be at least 8 characters")
+			apperrors.WriteError(w, r, http.StatusBadRequest, "invalid_password", "Password must be at least 8 characters")
 			return
 		}
 
-		// Hash password
 		passwordHash, err := HashPassword(password)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to hash password")
-			writeError(w, http.StatusInternalServerError, "internal_error", "Failed to create account")
+			apperrors.WriteInternalError(w, r, "Failed to create account")
 			return
 		}
 
-		// Insert user into database
-		userID := uuid.New()
-		query := `
-			INSERT INTO users (id, email, password_hash)
-			VALUES ($1, $2, $3)
-		`
+		var userID uuid.UUID
+		var createdAt time.Time
 
-		_, err = pool.Exec(r.Context(), query, userID, email, passwordHash)
+		query := `
+			INSERT INTO users (email, password_hash)
+			VALUES ($1, $2)
+			RETURNING id, created_at
+		`
+		err = pool.QueryRow(r.Context(), query, email, passwordHash).Scan(&userID, &createdAt)
 		if err != nil {
-			// Check for unique constraint violation
 			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-				writeError(w, http.StatusConflict, "conflict", "Email address already registered")
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				apperrors.WriteError(w, r, http.StatusConflict, "email_exists", "Email already registered")
 				return
 			}
 
 			log.Error().Err(err).Str("email", email).Msg("Failed to insert user")
-			writeError(w, http.StatusInternalServerError, "internal_error", "Failed to create account")
+			apperrors.WriteInternalError(w, r, "Failed to create account")
 			return
 		}
 
-		// Create audit log entry
-		if err := createAuditLog(r.Context(), pool, userID, "user.signup", email); err != nil {
-			log.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to create audit log")
-			// Don't fail the signup if audit log fails
+		if auditor != nil {
+			if err := auditor.LogUserSignup(r.Context(), userID, email); err != nil {
+				log.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to log audit event")
+			}
 		}
 
-		// Create JWT token
-		token, err := CreateToken(userID, jwtSecret, sessionDays)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to create token")
-			writeError(w, http.StatusInternalServerError, "internal_error", "Failed to create session")
-			return
-		}
-
-		// Set session cookie
-		SetSessionCookie(w, token, sessionDays, isProduction)
-
-		log.Info().
-			Str("user_id", userID.String()).
-			Str("email", email).
-			Msg("User signed up successfully")
-
-		// Return success response
-		writeSuccess(w, http.StatusCreated, SignupResponse{
-			UserID: userID,
-			Email:  email,
+		apperrors.WriteSuccess(w, r, http.StatusCreated, signupResponse{
+			User: userCreated{
+				ID:        userID,
+				Email:     email,
+				CreatedAt: createdAt.UTC().Format(time.RFC3339),
+			},
 		})
 	}
 }
 
-// LoginRequest represents the login request payload
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-// LoginResponse represents the login response
-type LoginResponse struct {
-	UserID uuid.UUID `json:"user_id"`
-	Email  string    `json:"email"`
-}
-
-// HandleLogin processes user authentication
-func HandleLogin(pool *pgxpool.Pool, jwtSecret string, sessionDays int, isProduction bool) http.HandlerFunc {
+// HandleLogin processes POST /api/v1/auth/login.
+func HandleLogin(pool *pgxpool.Pool, auditor *audit.Writer, jwtSecret string, sessionDays int, isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse form data
-		if err := r.ParseForm(); err != nil {
-			writeError(w, http.StatusBadRequest, "bad_request", "Invalid form data")
+		var req loginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			apperrors.WriteError(w, r, http.StatusBadRequest, "bad_request", "Invalid request body")
 			return
 		}
 
-		email := strings.TrimSpace(r.FormValue("email"))
-		password := r.FormValue("password")
-
-		// Validate input
+		email := strings.TrimSpace(req.Email)
+		password := req.Password
 		if email == "" || password == "" {
-			writeError(w, http.StatusUnauthorized, "unauthorized", "Invalid credentials")
+			writeInvalidCredentials(w, r)
 			return
 		}
 
-		// Look up user by email
 		var userID uuid.UUID
+		var dbEmail string
 		var passwordHash string
-		query := `SELECT id, password_hash FROM users WHERE email = $1`
 
-		err := pool.QueryRow(r.Context(), query, email).Scan(&userID, &passwordHash)
+		query := `SELECT id, email, password_hash FROM users WHERE email = $1`
+		err := pool.QueryRow(r.Context(), query, email).Scan(&userID, &dbEmail, &passwordHash)
 		if err != nil {
-			if err == pgx.ErrNoRows {
-				// User not found - return generic error
-				log.Debug().Str("email", email).Msg("Login failed: user not found")
-				writeError(w, http.StatusUnauthorized, "unauthorized", "Invalid credentials")
+			if errors.Is(err, pgx.ErrNoRows) {
+				maybeAuditLoginFailed(r, auditor, email)
+				writeInvalidCredentials(w, r)
 				return
 			}
+
 			log.Error().Err(err).Str("email", email).Msg("Failed to query user")
-			writeError(w, http.StatusInternalServerError, "internal_error", "Login failed")
+			apperrors.WriteInternalError(w, r, "Login failed")
 			return
 		}
 
-		// Verify password
 		if err := VerifyPassword(passwordHash, password); err != nil {
-			// Wrong password - return generic error
-			log.Debug().Str("email", email).Msg("Login failed: wrong password")
-			writeError(w, http.StatusUnauthorized, "unauthorized", "Invalid credentials")
+			maybeAuditLoginFailed(r, auditor, email)
+			writeInvalidCredentials(w, r)
 			return
 		}
 
-		// Create JWT token
 		token, err := CreateToken(userID, jwtSecret, sessionDays)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to create token")
-			writeError(w, http.StatusInternalServerError, "internal_error", "Failed to create session")
+			apperrors.WriteInternalError(w, r, "Failed to create session")
 			return
 		}
 
-		// Set session cookie
 		SetSessionCookie(w, token, sessionDays, isProduction)
 
-		log.Info().
-			Str("user_id", userID.String()).
-			Str("email", email).
-			Msg("User logged in successfully")
-
-		// Return success response
-		writeSuccess(w, http.StatusOK, LoginResponse{
-			UserID: userID,
-			Email:  email,
+		apperrors.WriteSuccess(w, r, http.StatusOK, loginResponse{
+			User: userSummary{
+				ID:    userID,
+				Email: dbEmail,
+			},
 		})
 	}
 }
 
-// HandleLogout processes user logout
-func HandleLogout(w http.ResponseWriter, r *http.Request) {
-	// Clear session cookie
-	ClearSessionCookie(w)
-
-	// Get user ID from context for logging
-	userID := GetUserID(r.Context())
-	if userID != uuid.Nil {
-		log.Info().Str("user_id", userID.String()).Msg("User logged out")
+// HandleLogout processes POST /api/v1/auth/logout.
+func HandleLogout(isProduction bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ClearSessionCookie(w, isProduction)
+		apperrors.WriteSuccess(w, r, http.StatusOK, logoutResponse{LoggedOut: true})
 	}
-
-	// Redirect to login page
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-// isValidEmail validates email format using net/mail (RFC 5322 simplified)
+func writeInvalidCredentials(w http.ResponseWriter, r *http.Request) {
+	apperrors.WriteError(w, r, http.StatusUnauthorized, "invalid_credentials", "Invalid credentials")
+}
+
+func maybeAuditLoginFailed(r *http.Request, auditor *audit.Writer, email string) {
+	if auditor == nil {
+		return
+	}
+
+	ip := remoteIP(r.RemoteAddr)
+	if !loginFailedAuditLimiter.Allow(ip, time.Now()) {
+		return
+	}
+
+	if err := auditor.LogLoginFailed(r.Context(), email, ip); err != nil {
+		log.Error().Err(err).Str("email", email).Msg("Failed to log login_failed audit event")
+	}
+}
+
+func remoteIP(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return remoteAddr
+}
+
 func isValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
-}
-
-// createAuditLog creates an audit log entry
-func createAuditLog(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, event, details string) error {
-	query := `
-		INSERT INTO audit_logs (id, user_id, event, details)
-		VALUES ($1, $2, $3, $4)
-	`
-	_, err := pool.Exec(ctx, query, uuid.New(), userID, event, details)
-	return err
 }

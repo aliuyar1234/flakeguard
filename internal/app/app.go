@@ -20,6 +20,7 @@ type App struct {
 	Config *config.Config
 	DB     *pgxpool.Pool
 	Router http.Handler
+	server *http.Server
 }
 
 // New creates and initializes a new application instance
@@ -32,7 +33,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	// Connect to database
 	log.Info().Msg("Connecting to database...")
-	pool, err := db.Connect(ctx, cfg.DatabaseDSN)
+	pool, err := db.Connect(ctx, cfg.DBDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -74,7 +75,7 @@ func (a *App) Start() error {
 	addr := a.Config.HTTPAddr
 	log.Info().Str("addr", addr).Msg("Starting HTTP server")
 
-	server := &http.Server{
+	a.server = &http.Server{
 		Addr:         addr,
 		Handler:      a.Router,
 		ReadTimeout:  15 * time.Second,
@@ -82,7 +83,7 @@ func (a *App) Start() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	return server.ListenAndServe()
+	return a.server.ListenAndServe()
 }
 
 // Close gracefully shuts down the application
@@ -94,13 +95,22 @@ func (a *App) Close() {
 	}
 }
 
+// Shutdown gracefully shuts down the HTTP server and closes the DB pool.
+func (a *App) Shutdown(ctx context.Context) error {
+	if a.server != nil {
+		if err := a.server.Shutdown(ctx); err != nil {
+			a.Close()
+			return err
+		}
+	}
+	a.Close()
+	return nil
+}
+
 // setupLogger configures the global logger
 func setupLogger(level string) {
-	// Set up pretty console output for development
-	log.Logger = log.Output(zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-	})
+	// Structured JSON logs to stdout (SSOT requirement)
+	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 
 	// Set log level
 	switch level {

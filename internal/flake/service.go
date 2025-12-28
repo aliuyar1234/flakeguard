@@ -2,6 +2,8 @@ package flake
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,82 +11,73 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Service handles flake business logic and queries
+var ErrFlakeNotFound = errors.New("flake not found")
+
+// Service handles flake business logic and queries.
 type Service struct {
 	pool *pgxpool.Pool
 }
 
-// NewService creates a new flake service
 func NewService(pool *pgxpool.Pool) *Service {
 	return &Service{pool: pool}
 }
 
-// ListFlakes returns a list of flaky tests with filtering and pagination
+// ListFlakes returns a list of flaky tests with filtering and pagination (used by web UI).
 func (s *Service) ListFlakes(ctx context.Context, projectID uuid.UUID, req ListFlakesRequest) ([]FlakeListItem, int, error) {
-	// Calculate cutoff date
 	cutoffDate := time.Now().AddDate(0, 0, -req.Days)
 
-	// Build query with filters
-	query := `
-		SELECT
-			fs.test_case_id,
-			tc.test_id,
-			cr.repo_full_name,
-			cj.job_name,
-			NULL as job_variant,
-			fs.mixed_outcome_runs,
-			fs.total_runs_seen,
-			fs.flake_score,
-			fs.first_seen_at,
-			fs.last_seen_at
-		FROM flake_stats fs
-		JOIN test_cases tc ON fs.test_case_id = tc.id
-		JOIN flake_events fe ON fs.test_case_id = fe.test_case_id
-		JOIN ci_runs cr ON fe.ci_run_id = cr.id
-		JOIN ci_run_attempts cra ON cra.ci_run_id = cr.id
-		JOIN ci_jobs cj ON cj.ci_run_attempt_id = cra.id
+	where := `
 		WHERE tc.project_id = $1
-			AND fs.last_seen_at >= $2
+		  AND fs.last_seen_at >= $2
 	`
 
-	args := []interface{}{projectID, cutoffDate}
+	args := []any{projectID, cutoffDate}
 	argNum := 3
 
-	// Add repo filter
 	if req.Repo != "" {
-		query += fmt.Sprintf(" AND cr.repo_full_name = $%d", argNum)
+		where += fmt.Sprintf(" AND tc.repo_full_name = $%d", argNum)
 		args = append(args, req.Repo)
 		argNum++
 	}
 
-	// Add job_name filter
 	if req.JobName != "" {
-		query += fmt.Sprintf(" AND cj.job_name = $%d", argNum)
+		where += fmt.Sprintf(" AND tc.job_name = $%d", argNum)
 		args = append(args, req.JobName)
 		argNum++
 	}
 
-	// Group by to get distinct test cases
-	query += `
-		GROUP BY
+	countQuery := `
+		SELECT COUNT(*)
+		FROM flake_stats fs
+		JOIN test_cases tc ON tc.id = fs.test_case_id
+	` + where
+
+	var total int
+	if err := s.pool.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	listQuery := `
+		SELECT
 			fs.test_case_id,
-			tc.test_id,
-			cr.repo_full_name,
-			cj.job_name,
+			tc.repo_full_name,
+			tc.job_name,
+			tc.job_variant,
+			tc.test_identifier,
+			fs.flake_score,
 			fs.mixed_outcome_runs,
 			fs.total_runs_seen,
-			fs.flake_score,
 			fs.first_seen_at,
 			fs.last_seen_at
+		FROM flake_stats fs
+		JOIN test_cases tc ON tc.id = fs.test_case_id
+	` + where + `
 		ORDER BY fs.flake_score DESC, fs.last_seen_at DESC
-	`
+	` + fmt.Sprintf(" LIMIT $%d OFFSET $%d", argNum, argNum+1)
 
-	// Add pagination
-	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argNum, argNum+1)
 	args = append(args, req.Limit, req.Offset)
 
-	// Execute query
-	rows, err := s.pool.Query(ctx, query, args...)
+	rows, err := s.pool.Query(ctx, listQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -95,13 +88,13 @@ func (s *Service) ListFlakes(ctx context.Context, projectID uuid.UUID, req ListF
 		var item FlakeListItem
 		if err := rows.Scan(
 			&item.TestCaseID,
-			&item.TestIdentifier,
 			&item.RepoFullName,
 			&item.JobName,
 			&item.JobVariant,
+			&item.TestIdentifier,
+			&item.FlakeScore,
 			&item.MixedOutcomeRuns,
 			&item.TotalRunsSeen,
-			&item.FlakeScore,
 			&item.FirstSeenAt,
 			&item.LastSeenAt,
 		); err != nil {
@@ -109,84 +102,73 @@ func (s *Service) ListFlakes(ctx context.Context, projectID uuid.UUID, req ListF
 		}
 		flakes = append(flakes, item)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
 
-	// Get total count (simplified - just return current count for now)
-	// In production, you'd run a separate COUNT query
-	total := len(flakes)
-
 	return flakes, total, nil
 }
 
-// GetFlakeDetail returns detailed information about a specific flaky test
-func (s *Service) GetFlakeDetail(ctx context.Context, projectID, testCaseID uuid.UUID, evidenceLimit, evidenceOffset int) (*FlakeDetail, int, error) {
-	// Query flake stats
+func (s *Service) GetFlakeDetail(ctx context.Context, projectID, testCaseID uuid.UUID, days, evidenceLimit, evidenceOffset int) (*FlakeDetail, int, error) {
+	cutoffDate := time.Now().AddDate(0, 0, -days)
+
 	statsQuery := `
 		SELECT
-			fs.test_case_id,
-			tc.test_id,
-			cr.repo_full_name,
-			cj.job_name,
-			NULL as job_variant,
+			tc.id,
+			tc.repo_full_name,
+			tc.job_name,
+			tc.job_variant,
+			tc.test_identifier,
+			fs.flake_score,
 			fs.mixed_outcome_runs,
 			fs.total_runs_seen,
-			fs.flake_score,
 			fs.last_failure_message,
 			fs.first_seen_at,
 			fs.last_seen_at
 		FROM flake_stats fs
-		JOIN test_cases tc ON fs.test_case_id = tc.id
-		LEFT JOIN flake_events fe ON fs.test_case_id = fe.test_case_id
-		LEFT JOIN ci_runs cr ON fe.ci_run_id = cr.id
-		LEFT JOIN ci_run_attempts cra ON cra.ci_run_id = cr.id
-		LEFT JOIN ci_jobs cj ON cj.ci_run_attempt_id = cra.id
-		WHERE fs.test_case_id = $1
-			AND tc.project_id = $2
+		JOIN test_cases tc ON tc.id = fs.test_case_id
+		WHERE tc.project_id = $1
+		  AND tc.id = $2
 		LIMIT 1
 	`
 
 	var detail FlakeDetail
-	err := s.pool.QueryRow(ctx, statsQuery, testCaseID, projectID).Scan(
+	if err := s.pool.QueryRow(ctx, statsQuery, projectID, testCaseID).Scan(
 		&detail.TestCaseID,
-		&detail.TestIdentifier,
 		&detail.RepoFullName,
 		&detail.JobName,
 		&detail.JobVariant,
+		&detail.TestIdentifier,
+		&detail.FlakeScore,
 		&detail.MixedOutcomeRuns,
 		&detail.TotalRunsSeen,
-		&detail.FlakeScore,
 		&detail.LastFailureMessage,
 		&detail.FirstSeenAt,
 		&detail.LastSeenAt,
-	)
-	if err != nil {
-		return nil, 0, fmt.Errorf("flake not found")
+	); err != nil {
+		return nil, 0, ErrFlakeNotFound
 	}
 
-	// Query evidence (flake events)
 	evidenceQuery := `
 		SELECT
-			fe.ci_run_id,
-			NULL as run_url,
-			cr.commit_sha,
-			cj.job_name,
-			NULL as job_variant,
+			cr.github_run_id,
+			cr.run_url,
+			cr.sha,
 			fe.failed_attempt_number,
 			fe.passed_attempt_number,
-			fe.created_at
+			failed.completed_at,
+			passed.completed_at
 		FROM flake_events fe
-		JOIN ci_runs cr ON fe.ci_run_id = cr.id
-		JOIN ci_run_attempts cra ON cra.ci_run_id = cr.id
-		JOIN ci_jobs cj ON cj.ci_run_attempt_id = cra.id
+		JOIN ci_runs cr ON cr.id = fe.ci_run_id
+		LEFT JOIN ci_run_attempts failed ON failed.ci_run_id = cr.id AND failed.attempt_number = fe.failed_attempt_number
+		LEFT JOIN ci_run_attempts passed ON passed.ci_run_id = cr.id AND passed.attempt_number = fe.passed_attempt_number
 		WHERE fe.test_case_id = $1
+		  AND fe.created_at >= $2
 		ORDER BY fe.created_at DESC
-		LIMIT $2 OFFSET $3
+		LIMIT $3 OFFSET $4
 	`
 
-	rows, err := s.pool.Query(ctx, evidenceQuery, testCaseID, evidenceLimit, evidenceOffset)
+	rows, err := s.pool.Query(ctx, evidenceQuery, testCaseID, cutoffDate, evidenceLimit, evidenceOffset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -195,31 +177,42 @@ func (s *Service) GetFlakeDetail(ctx context.Context, projectID, testCaseID uuid
 	var evidence []FlakeEvidence
 	for rows.Next() {
 		var ev FlakeEvidence
+		var failedAt sql.NullTime
+		var passedAt sql.NullTime
+
 		if err := rows.Scan(
-			&ev.CIRunID,
+			&ev.GitHubRunID,
 			&ev.RunURL,
 			&ev.SHA,
-			&ev.JobName,
-			&ev.JobVariant,
-			&ev.FailedAttemptNumber,
-			&ev.PassedAttemptNumber,
-			&ev.CreatedAt,
+			&ev.AttemptFailed,
+			&ev.AttemptPassed,
+			&failedAt,
+			&passedAt,
 		); err != nil {
 			return nil, 0, err
 		}
+		if failedAt.Valid {
+			ev.FailedAt = &failedAt.Time
+		}
+		if passedAt.Valid {
+			ev.PassedAt = &passedAt.Time
+		}
 		evidence = append(evidence, ev)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
 
 	detail.Evidence = evidence
 
-	// Count total evidence
 	var evidenceTotal int
-	countQuery := `SELECT COUNT(*) FROM flake_events WHERE test_case_id = $1`
-	if err := s.pool.QueryRow(ctx, countQuery, testCaseID).Scan(&evidenceTotal); err != nil {
+	countQuery := `
+		SELECT COUNT(*)
+		FROM flake_events
+		WHERE test_case_id = $1
+		  AND created_at >= $2
+	`
+	if err := s.pool.QueryRow(ctx, countQuery, testCaseID, cutoffDate).Scan(&evidenceTotal); err != nil {
 		return nil, 0, err
 	}
 

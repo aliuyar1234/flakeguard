@@ -2,13 +2,17 @@ package flake
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/flakeguard/flakeguard/internal/config"
+	"github.com/flakeguard/flakeguard/internal/orgs"
 	"github.com/flakeguard/flakeguard/internal/projects"
 	"github.com/flakeguard/flakeguard/internal/slack"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
@@ -71,8 +75,15 @@ func (d *Detector) DetectFlakes(ctx context.Context, projectID, ciRunID uuid.UUI
 		attemptsByTest[attempt.TestCaseID] = append(attemptsByTest[attempt.TestCaseID], attempt)
 	}
 
+	type notification struct {
+		testCaseID    uuid.UUID
+		failedAttempt int
+		passedAttempt int
+	}
+
 	flakeEventsCreated := 0
 	statsService := NewStatsService(d.pool)
+	var notifications []notification
 
 	// Detect flakes for each test
 	for testCaseID, testAttempts := range attemptsByTest {
@@ -107,6 +118,11 @@ func (d *Detector) DetectFlakes(ctx context.Context, projectID, ciRunID uuid.UUI
 			}
 
 			flakeEventsCreated++
+			notifications = append(notifications, notification{
+				testCaseID:    testCaseID,
+				failedAttempt: failedAttempt,
+				passedAttempt: passedAttempt,
+			})
 		}
 	}
 
@@ -117,14 +133,9 @@ func (d *Detector) DetectFlakes(ctx context.Context, projectID, ciRunID uuid.UUI
 
 	// Send Slack notifications asynchronously after transaction commit
 	// Only send if Slack client is configured
-	if d.slackClient != nil && flakeEventsCreated > 0 {
-		// Trigger async notifications for all detected flakes
-		for testCaseID, testAttempts := range attemptsByTest {
-			flakeDetected, failedAttempt, passedAttempt, _ := d.detectFlakePattern(testAttempts)
-			if flakeDetected {
-				// Send notification asynchronously
-				go d.notifySlackAsync(projectID, ciRunID, testCaseID, failedAttempt, passedAttempt)
-			}
+	if d.slackClient != nil {
+		for _, n := range notifications {
+			go d.notifySlackAsync(projectID, ciRunID, n.testCaseID, n.failedAttempt, n.passedAttempt)
 		}
 	}
 
@@ -228,12 +239,8 @@ func isDuplicateKeyError(err error) bool {
 	if err == nil {
 		return false
 	}
-	// Check for PostgreSQL unique violation error code 23505
-	return err.Error() != "" && (
-		// pgx error messages contain "duplicate key value violates unique constraint"
-		len(err.Error()) > 20 && err.Error()[:20] == "ERROR: duplicate key" ||
-		// or check for the error code
-		err.Error() == "23505")
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // notifySlackAsync sends a Slack notification for a flake event
@@ -263,6 +270,17 @@ func (d *Detector) notifySlackAsync(projectID, ciRunID, testCaseID uuid.UUID, fa
 		return
 	}
 
+	// Load org slug for dashboard URL
+	orgService := orgs.NewService(d.pool)
+	org, err := orgService.GetByID(ctx, project.OrgID)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("org_id", project.OrgID.String()).
+			Msg("Failed to load org for Slack notification")
+		return
+	}
+
 	// Get flake details for the message
 	flakeInfo, err := d.getFlakeInfo(ctx, ciRunID, testCaseID)
 	if err != nil {
@@ -275,7 +293,7 @@ func (d *Detector) notifySlackAsync(projectID, ciRunID, testCaseID uuid.UUID, fa
 	}
 
 	// Build dashboard URL
-	dashboardURL := d.buildDashboardURL(project.OrgID, projectID, testCaseID)
+	dashboardURL := d.buildDashboardURL(org.Slug, project.Slug, testCaseID)
 
 	// Build and send Slack message
 	msg := slack.FlakeMessage{
@@ -306,13 +324,11 @@ func (d *Detector) getFlakeInfo(ctx context.Context, ciRunID, testCaseID uuid.UU
 		SELECT
 			cr.repo_full_name,
 			cr.workflow_name,
-			cj.job_name,
-			tc.test_id
-		FROM test_cases tc
-		JOIN ci_runs cr ON cr.id = $1
-		JOIN ci_run_attempts cra ON cra.ci_run_id = cr.id
-		JOIN ci_jobs cj ON cj.ci_run_attempt_id = cra.id
-		WHERE tc.id = $2
+			tc.job_name,
+			tc.test_identifier
+		FROM ci_runs cr
+		JOIN test_cases tc ON tc.id = $2
+		WHERE cr.id = $1
 		LIMIT 1
 	`
 
@@ -332,11 +348,10 @@ func (d *Detector) getFlakeInfo(ctx context.Context, ciRunID, testCaseID uuid.UU
 }
 
 // buildDashboardURL constructs the dashboard URL for a flake
-func (d *Detector) buildDashboardURL(orgID, projectID, testCaseID uuid.UUID) string {
-	if d.baseURL == "" {
-		return fmt.Sprintf("http://localhost:8080/orgs/%s/projects/%s/flakes/%s",
-			orgID.String(), projectID.String(), testCaseID.String())
+func (d *Detector) buildDashboardURL(orgSlug, projectSlug string, testCaseID uuid.UUID) string {
+	base := strings.TrimRight(d.baseURL, "/")
+	if base == "" {
+		base = "http://localhost:8080"
 	}
-	return fmt.Sprintf("%s/orgs/%s/projects/%s/flakes/%s",
-		d.baseURL, orgID.String(), projectID.String(), testCaseID.String())
+	return fmt.Sprintf("%s/orgs/%s/projects/%s/flakes/%s", base, orgSlug, projectSlug, testCaseID.String())
 }

@@ -3,7 +3,6 @@ package app
 import (
 	"github.com/flakeguard/flakeguard/internal/apperrors"
 	"net/http"
-	"time"
 
 	"github.com/flakeguard/flakeguard/internal/apikey"
 	"github.com/flakeguard/flakeguard/internal/apikeys"
@@ -17,6 +16,7 @@ import (
 	"github.com/flakeguard/flakeguard/internal/web"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,17 +27,28 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 	isProduction := !cfg.IsDev()
 
 	// Middleware stack
-	r.Use(middleware.RealIP)                                   // Set RemoteAddr to real IP
-	r.Use(RequestIDMiddleware)                                 // Add request ID to context
-	r.Use(middleware.Logger)                                   // Log requests
-	r.Use(middleware.Recoverer)                                // Recover from panics
-	r.Use(middleware.RequestID)                                // Chi's request ID (backup)
-	r.Use(middleware.Compress(5))                              // Compress responses
-	r.Use(auth.AuthMiddleware(cfg.JWTSecret, cfg.SessionDays)) // Validate session cookies
+	r.Use(middleware.RealIP)         // Set RemoteAddr to real IP
+	r.Use(RequestIDMiddleware)       // Add request ID to context
+	r.Use(LoggingMiddleware)         // Structured request logging
+	r.Use(RecoveryMiddleware)        // Recover from panics
+	r.Use(cors.Handler(cors.Options{ // CORS (pinned dep)
+		AllowedOrigins:   []string{cfg.BaseURL},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+	r.Use(auth.AuthMiddleware(cfg.JWTSecret, isProduction)) // Validate session cookies
+
+	// Audit writer (shared across API routes)
+	auditor := audit.NewWriter(pool)
 
 	// Health check routes (no authentication required)
 	r.Get("/healthz", handleHealthz)
 	r.Get("/readyz", handleReadyz(pool))
+
+	// Static assets
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
 	// Public routes - HTML pages
 	r.Group(func(r chi.Router) {
@@ -52,17 +63,14 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 		r.Use(CSRFMiddleware(isProduction)) // Validate CSRF tokens
 
 		// Signup (no rate limit for now)
-		r.Post("/signup", auth.HandleSignup(pool, cfg.JWTSecret, cfg.SessionDays, isProduction))
+		r.Post("/signup", auth.HandleSignup(pool, auditor))
 
 		// Login with rate limiting (10 requests per minute)
-		r.With(RateLimitMiddleware(10, time.Minute)).Post("/login", auth.HandleLogin(pool, cfg.JWTSecret, cfg.SessionDays, isProduction))
+		r.With(LoginRateLimitMiddleware()).Post("/login", auth.HandleLogin(pool, auditor, cfg.JWTSecret, cfg.SessionDays, isProduction))
 
 		// Logout (requires authentication)
-		r.With(auth.RequireAuth).Post("/logout", auth.HandleLogout)
+		r.With(auth.RequireAuth).Post("/logout", auth.HandleLogout(isProduction))
 	})
-
-	// Create audit writer (shared across API routes)
-	auditor := audit.NewWriter(pool)
 
 	// API routes - Organizations (require authentication)
 	r.Route("/api/v1/orgs", func(r chi.Router) {
@@ -116,7 +124,7 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 
 	// Protected routes - require authentication
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth)
+		r.Use(auth.RequireAuthPage)
 		r.Use(NoCacheMiddleware)
 
 		// Organizations

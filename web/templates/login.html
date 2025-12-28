@@ -1,12 +1,12 @@
 {{define "content"}}
-<div style="max-width: 400px; margin: 0 auto;">
+<div class="auth-container">
     <h2>Log In</h2>
 
     {{if .Error}}
     <div class="error">{{.Error}}</div>
     {{end}}
 
-    <form method="POST" action="/api/v1/auth/login">
+    <form method="POST" action="/api/v1/auth/login" data-json-form data-redirect="/orgs">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
         <div class="form-group">
@@ -19,7 +19,9 @@
             <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
 
-        <button type="submit">Log In</button>
+        <div class="button-row">
+            <button type="submit" class="btn btn-primary">Log In</button>
+        </div>
 
         <div class="text-center mt-1">
             <a href="/signup" class="link">Don't have an account? Sign up</a>

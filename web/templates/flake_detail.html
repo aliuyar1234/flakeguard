@@ -1,135 +1,97 @@
 {{define "content"}}
-{{$detail := index .Data "Detail"}}
-{{$orgSlug := index .Data "OrgSlug"}}
-{{$projectSlug := index .Data "ProjectSlug"}}
-
-<div style="margin-bottom: 2rem;">
-    <div style="margin-bottom: 2rem;">
-        <a href="/orgs/{{$orgSlug}}/projects/{{$projectSlug}}/flakes" class="link">← Back to Flakes List</a>
+{{$detail := .Data.Detail}}
+<div>
+    <div class="mb-1">
+        <a href="/orgs/{{.Data.OrgSlug}}/projects/{{.Data.ProjectSlug}}/flakes?days={{.Data.Days}}" class="link">&larr; Back to Flakes List</a>
     </div>
 
-    <!-- Flake Header -->
-    <div style="background: white; border-left: 4px solid #e74c3c; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-        <h2 style="margin: 0 0 1rem 0; color: #2c3e50;">{{$detail.TestIdentifier}}</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; color: #666;">
-            <div>
-                <strong>Repository:</strong><br>
-                {{$detail.RepoFullName}}
-            </div>
-            <div>
-                <strong>Job:</strong><br>
-                {{$detail.JobName}}
-            </div>
-        </div>
+    <div class="card mb-2">
+        <h2 class="mb-1">{{$detail.TestIdentifier}}</h2>
+        <div class="text-muted mb-1"><strong>Repository:</strong> {{$detail.RepoFullName}}</div>
+        <div class="text-muted"><strong>Job:</strong> {{$detail.JobName}}{{if $detail.JobVariant}} ({{$detail.JobVariant}}){{end}}</div>
     </div>
 
-    <!-- Statistics -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <div class="stats-grid mb-2">
         <div class="stat-card">
             <div class="stat-label">Flake Score</div>
             <div class="stat-value">
-                <span class="flake-score flake-score-{{if ge $detail.FlakeScore 0.7}}high{{else if ge $detail.FlakeScore 0.4}}medium{{else}}low{{end}}"
-                      style="font-size: 2rem; padding: 0.5rem 1rem;">
-                    {{printf "%.1f%%" (mul $detail.FlakeScore 100)}}
+                <span class="flake-score flake-score-{{if ge $detail.FlakeScore 0.7}}high{{else if ge $detail.FlakeScore 0.4}}medium{{else}}low{{end}}">
+                    {{printf "%.2f" $detail.FlakeScore}}
                 </span>
             </div>
         </div>
+
         <div class="stat-card">
             <div class="stat-label">Mixed Outcome Runs</div>
             <div class="stat-value">{{$detail.MixedOutcomeRuns}}</div>
         </div>
+
         <div class="stat-card">
             <div class="stat-label">Total Runs Seen</div>
             <div class="stat-value">{{$detail.TotalRunsSeen}}</div>
         </div>
+
         <div class="stat-card">
             <div class="stat-label">First Seen</div>
-            <div class="stat-value" style="font-size: 1.2rem;">{{$detail.FirstSeenAt.Format "2006-01-02"}}</div>
+            <div class="stat-value">{{ $detail.FirstSeenAt.Format "2006-01-02" }}</div>
         </div>
     </div>
 
-    <!-- Last Failure Message -->
-    {{if $detail.LastFailureMessage}}
-    <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;">
-        <h3 style="margin: 0 0 1rem 0; color: #856404;">Last Failure Message</h3>
-        {{$msg := index $detail.LastFailureMessage}}
-        {{$truncated := false}}
-        {{$displayMsg := $msg}}
-        {{if gt (len $msg) 500}}
-            {{$displayMsg = printf "%s..." (slice $msg 0 500)}}
-            {{$truncated = true}}
+    {{if .Data.LastFailureMessageDisplay}}
+    <h3>Last Failure Message</h3>
+    <div class="card mb-2">
+        <pre class="code-block">{{.Data.LastFailureMessageDisplay}}</pre>
+        {{if .Data.LastFailureMessageTruncated}}
+        <div class="text-muted mt-1">Displayed message truncated to 500 characters.</div>
         {{end}}
-        <pre style="background: #fff; padding: 1rem; border-radius: 4px; overflow-x: auto; margin: 0; font-size: 0.9rem; white-space: pre-wrap; word-wrap: break-word;">{{$displayMsg}}</pre>
-        {{if $truncated}}
-        <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; color: #856404; font-style: italic;">
-            Message truncated for display. Full message may be longer.
-        </p>
+        {{if .Data.LastFailureMessageIngestionTruncated}}
+        <div class="text-muted mt-1">Ingestion truncated the original message.</div>
         {{end}}
     </div>
     {{end}}
 
-    <!-- Evidence List -->
-    <div>
-        <h3 style="margin-bottom: 1rem;">Flake Evidence</h3>
-        {{$evidenceTotal := index .Data "EvidenceTotal"}}
-        <p style="color: #666; margin-bottom: 1rem;">Showing {{len $detail.Evidence}} of {{$evidenceTotal}} flake event(s)</p>
+    <h3>Flake Evidence</h3>
+    <p class="text-muted mb-1">Showing {{len $detail.Evidence}} of {{.Data.EvidenceTotal}} event(s)</p>
 
-        {{if eq (len $detail.Evidence) 0}}
-            <div style="background: #e7f3ff; border-left: 4px solid #2196F3; padding: 1.5rem; border-radius: 4px;">
-                <p style="margin: 0; color: #1976D2;">No evidence found for this flake.</p>
-            </div>
-        {{else}}
-            <table class="evidence-table">
-                <thead>
-                    <tr>
-                        <th style="text-align: left;">CI Run</th>
-                        <th style="text-align: left;">Commit SHA</th>
-                        <th style="text-align: center;">Failed Attempt</th>
-                        <th style="text-align: center;">Passed Attempt</th>
-                        <th style="text-align: left;">Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range $detail.Evidence}}
-                    <tr>
-                        <td>
-                            {{if .RunURL}}
-                                <a href="{{index .RunURL}}" target="_blank" rel="noopener noreferrer" class="link">
-                                    {{slice .CIRunID.String 0 8}}...
-                                </a>
-                            {{else}}
-                                <code style="font-family: monospace; background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 3px;">
-                                    {{slice .CIRunID.String 0 8}}...
-                                </code>
-                            {{end}}
-                        </td>
-                        <td>
-                            <code style="font-family: monospace; background: #f5f5f5; padding: 0.2rem 0.4rem; border-radius: 3px;">
-                                {{slice .SHA 0 7}}
-                            </code>
-                        </td>
-                        <td style="text-align: center;">
-                            <span style="background: #fee; color: #c33; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 500;">
-                                #{{.FailedAttemptNumber}}
-                            </span>
-                        </td>
-                        <td style="text-align: center;">
-                            <span style="background: #efe; color: #3c3; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 500;">
-                                #{{.PassedAttemptNumber}}
-                            </span>
-                        </td>
-                        <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
-                    </tr>
-                    {{end}}
-                </tbody>
-            </table>
-
-            {{if ge $evidenceTotal 100}}
-            <p style="margin-top: 1rem; color: #666; font-style: italic;">
-                Showing most recent 100 events.
-            </p>
-            {{end}}
-        {{end}}
+    {{if eq (len $detail.Evidence) 0}}
+    <div class="empty-state">
+        <p class="mb-0">No evidence found for this flake.</p>
     </div>
+    {{else}}
+    <table class="evidence-table">
+        <thead>
+            <tr>
+                <th>GitHub Run</th>
+                <th>SHA</th>
+                <th>Failed Attempt</th>
+                <th>Passed Attempt</th>
+                <th>Failed At</th>
+                <th>Passed At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range $detail.Evidence}}
+            <tr>
+                <td>
+                    {{if .RunURL}}
+                    <a href="{{.RunURL}}" target="_blank" rel="noopener noreferrer" class="link">{{.GitHubRunID}}</a>
+                    {{else}}
+                    <span class="code-pill">{{.GitHubRunID}}</span>
+                    {{end}}
+                </td>
+                <td><span class="code-pill">{{printf "%.7s" .SHA}}</span></td>
+                <td><span class="code-pill">#{{.AttemptFailed}}</span></td>
+                <td><span class="code-pill">#{{.AttemptPassed}}</span></td>
+                <td>{{if .FailedAt}}{{.FailedAt.Format "2006-01-02 15:04"}}{{else}}&mdash;{{end}}</td>
+                <td>{{if .PassedAt}}{{.PassedAt.Format "2006-01-02 15:04"}}{{else}}&mdash;{{end}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+
+    {{if ge .Data.EvidenceTotal 100}}
+    <p class="text-muted mt-1">Showing most recent 100 events.</p>
+    {{end}}
+    {{end}}
 </div>
 {{end}}

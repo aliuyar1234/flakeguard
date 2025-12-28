@@ -27,8 +27,8 @@ type UploadLimits struct {
 func DefaultUploadLimits() UploadLimits {
 	return UploadLimits{
 		MaxFiles:      20,
-		MaxFileBytes:  1 * 1024 * 1024,  // 1MB
-		MaxTotalBytes: 5 * 1024 * 1024,  // 5MB
+		MaxFileBytes:  1 * 1024 * 1024, // 1MB
+		MaxTotalBytes: 5 * 1024 * 1024, // 5MB
 	}
 }
 

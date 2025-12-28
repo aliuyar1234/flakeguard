@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 // ApiKeyScope represents a permission scope for an API key
@@ -18,16 +17,16 @@ const (
 
 // ApiKey represents an API key for project access
 type ApiKey struct {
-	ID              uuid.UUID      `db:"id"`
-	ProjectID       uuid.UUID      `db:"project_id"`
-	Name            string         `db:"name"`
-	TokenHash       []byte         `db:"token_hash"`
-	Scopes          pq.StringArray `db:"scopes"`
-	RevokedAt       sql.NullTime   `db:"revoked_at"`
-	LastUsedAt      sql.NullTime   `db:"last_used_at"`
-	CreatedByUserID uuid.UUID      `db:"created_by_user_id"`
-	CreatedAt       time.Time      `db:"created_at"`
-	UpdatedAt       time.Time      `db:"updated_at"`
+	ID              uuid.UUID    `db:"id"`
+	ProjectID       uuid.UUID    `db:"project_id"`
+	Name            string       `db:"name"`
+	TokenHash       []byte       `db:"token_hash"`
+	Scopes          []string     `db:"scopes"`
+	RevokedAt       sql.NullTime `db:"revoked_at"`
+	LastUsedAt      sql.NullTime `db:"last_used_at"`
+	CreatedByUserID uuid.UUID    `db:"created_by_user_id"`
+	CreatedAt       time.Time    `db:"created_at"`
+	UpdatedAt       time.Time    `db:"updated_at"`
 }
 
 // IsRevoked returns true if the API key has been revoked
@@ -40,34 +39,45 @@ func (k *ApiKey) IsActive() bool {
 	return !k.IsRevoked()
 }
 
-// ApiKeyResponse represents an API key in API responses (without token hash)
-type ApiKeyResponse struct {
-	ID        uuid.UUID  `json:"id"`
-	ProjectID uuid.UUID  `json:"project_id"`
-	Name      string     `json:"name"`
-	Scopes    []string   `json:"scopes"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+type ApiKeyCreatedResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Scopes    []string  `json:"scopes"`
+	Token     string    `json:"token"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
-// ApiKeyWithToken represents a newly created API key with the plaintext token
-// This is only returned once when the key is created
-type ApiKeyWithToken struct {
-	ApiKeyResponse
-	Token string `json:"token"`
+type ApiKeyListItemResponse struct {
+	ID         uuid.UUID  `json:"id"`
+	Name       string     `json:"name"`
+	Scopes     []string   `json:"scopes"`
+	CreatedAt  time.Time  `json:"created_at"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
 }
 
-// ToResponse converts an ApiKey to an ApiKeyResponse (without token)
-func (k *ApiKey) ToResponse() ApiKeyResponse {
-	resp := ApiKeyResponse{
+func (k *ApiKey) ToCreatedResponse(token string) ApiKeyCreatedResponse {
+	return ApiKeyCreatedResponse{
 		ID:        k.ID,
-		ProjectID: k.ProjectID,
 		Name:      k.Name,
-		Scopes:    []string(k.Scopes),
+		Scopes:    append([]string(nil), k.Scopes...),
+		Token:     token,
+		CreatedAt: k.CreatedAt,
+	}
+}
+
+func (k *ApiKey) ToListItemResponse() ApiKeyListItemResponse {
+	resp := ApiKeyListItemResponse{
+		ID:        k.ID,
+		Name:      k.Name,
+		Scopes:    append([]string(nil), k.Scopes...),
 		CreatedAt: k.CreatedAt,
 	}
 	if k.RevokedAt.Valid {
 		resp.RevokedAt = &k.RevokedAt.Time
+	}
+	if k.LastUsedAt.Valid {
+		resp.LastUsedAt = &k.LastUsedAt.Time
 	}
 	return resp
 }

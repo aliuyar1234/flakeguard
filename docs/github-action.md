@@ -1,10 +1,6 @@
 # FlakeGuard GitHub Action
 
-Upload JUnit test results to FlakeGuard for automated flake detection.
-
-## Overview
-
-The FlakeGuard GitHub Action uploads JUnit XML test results to your FlakeGuard instance during CI runs. It automatically extracts GitHub context (repository, commit, branch, workflow, job) and associates test results with your project.
+Upload JUnit XML test results from GitHub Actions to FlakeGuard for flake detection.
 
 ## Quick Start
 
@@ -12,8 +8,8 @@ Add this step to your GitHub Actions workflow after running tests:
 
 ```yaml
 - name: Upload test results to FlakeGuard
-  uses: ./action  # Or your-org/flakeguard-action@v1 when published
-  if: always()  # Upload even if tests fail
+  uses: ./action # Or your-org/flakeguard-action@v1 when published
+  if: always() # Upload even if tests fail
   with:
     flakeguard_url: 'https://flakeguard.example.com'
     project_slug: 'my-project'
@@ -25,69 +21,30 @@ Add this step to your GitHub Actions workflow after running tests:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `flakeguard_url` | FlakeGuard server URL (e.g., `https://flakeguard.example.com`) | Yes | - |
-| `project_slug` | Project slug from FlakeGuard dashboard | Yes | - |
-| `api_key` | FlakeGuard API key (use `secrets.FLAKEGUARD_API_KEY`) | Yes | - |
-| `junit_paths` | Glob pattern for JUnit XML files (e.g., `test-results/**/*.xml`) | Yes | - |
-| `job_variant` | Optional job variant identifier (e.g., `python-3.9`, `ubuntu-latest`) | No | `''` |
+| `flakeguard_url` | Base URL of your FlakeGuard instance | Yes | - |
+| `project_slug` | Project slug from FlakeGuard | Yes | - |
+| `api_key` | Project API key (store in GitHub Secrets) | Yes | - |
+| `junit_paths` | Glob for JUnit XML files | Yes | - |
+| `job_variant` | Optional variant label (matrix builds, OS, runtime) | No | `''` |
 
 ## Examples
 
-### Basic Workflow
+### Matrix Builds with `job_variant`
 
 ```yaml
-name: Tests
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run tests
-        run: |
-          npm test -- --reporter=junit --outputFile=test-results/junit.xml
-
-      - name: Upload to FlakeGuard
-        uses: ./action
-        if: always()  # Upload even if tests fail
-        with:
-          flakeguard_url: 'https://flakeguard.example.com'
-          project_slug: 'my-project'
-          api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
-          junit_paths: 'test-results/**/*.xml'
-```
-
-### Matrix Builds with Job Variants
-
-Use `job_variant` to distinguish results from different matrix combinations:
-
-```yaml
-name: Tests
-
-on: [push, pull_request]
-
 jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.9', '3.10', '3.11']
-
+        python: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Run tests
-        run: |
-          pytest --junit-xml=test-results/junit.xml
+          python-version: ${{ matrix.python }}
+      - run: pytest --junit-xml=test-results/junit.xml
 
       - name: Upload to FlakeGuard
         uses: ./action
@@ -97,117 +54,48 @@ jobs:
           project_slug: 'my-project'
           api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
           junit_paths: 'test-results/**/*.xml'
-          job_variant: '${{ matrix.os }}-python-${{ matrix.python-version }}'
+          job_variant: '${{ matrix.os }}-python-${{ matrix.python }}'
 ```
 
-### Multiple Test Suites
+## What It Uploads
 
-Upload results from multiple test directories:
+The action sends a multipart request to `POST /api/v1/ingest/junit`:
 
-```yaml
-- name: Upload unit test results
-  uses: ./action
-  if: always()
-  with:
-    flakeguard_url: 'https://flakeguard.example.com'
-    project_slug: 'my-project'
-    api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
-    junit_paths: 'test-results/unit/**/*.xml'
-    job_variant: 'unit-tests'
+- `meta` (application/json): run metadata derived from the GitHub Actions context
+- `junit` (file): one part per matched JUnit XML file
 
-- name: Upload integration test results
-  uses: ./action
-  if: always()
-  with:
-    flakeguard_url: 'https://flakeguard.example.com'
-    project_slug: 'my-project'
-    api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
-    junit_paths: 'test-results/integration/**/*.xml'
-    job_variant: 'integration-tests'
-```
+Metadata includes (SSOT 8.9.1):
 
-## Metadata Captured
+- `project_slug`
+- `repo_full_name`
+- `workflow_name`, `workflow_ref`
+- `github_run_id`, `github_run_attempt`, `github_run_number`, `run_url`
+- `sha`, `branch`, `event`, `pr_number`
+- `job_name`, `job_variant`
+- `started_at`, `completed_at`
 
-The action automatically extracts the following metadata from GitHub Actions context:
+## Behavior Notes
 
-- **Repository**: `GITHUB_REPOSITORY` (e.g., `owner/repo`)
-- **Commit SHA**: `GITHUB_SHA`
-- **Branch**: Extracted from `GITHUB_REF` (handles branches, PRs, tags)
-- **Workflow Name**: `GITHUB_WORKFLOW`
-- **Job Name**: `GITHUB_JOB`
-- **Run ID**: `GITHUB_RUN_ID`
-- **Run Attempt**: `GITHUB_RUN_ATTEMPT`
-- **Job Variant**: User-provided input (optional)
+- If no files match `junit_paths`, the action logs a warning and exits `0` (does not fail your workflow).
+- The API key is masked via `::add-mask::` in `action.yml` and is never printed by the upload script.
 
 ## Troubleshooting
 
-### No files found matching pattern
+### 400 `invalid_meta`
 
-**Symptom**: Warning message "No JUnit files found matching pattern"
+- Ensure `project_slug` matches the project behind your API key.
+- Verify the workflow is running on GitHub Actions (the action requires standard `GITHUB_*` context variables).
 
-**Solution**: This is not an error - the action exits successfully (exit 0) and continues your workflow. Check:
+### 401 Unauthorized
 
-1. Verify your test framework generates JUnit XML output
-2. Check the file path in `junit_paths` matches where tests write results
-3. Ensure tests ran before the upload step
-4. Try listing files: `run: ls -la test-results/` before upload
+- Ensure the secret contains a valid project API key with scope `ingest:write`.
+- Ensure the key is not revoked.
 
-### Upload fails with 401 Unauthorized
+### 413 Payload Too Large
 
-**Symptom**: Error "Upload failed with HTTP status 401"
+- Reduce the size/number of JUnit files being uploaded, or increase limits on the FlakeGuard server (`FG_MAX_UPLOAD_BYTES`, `FG_MAX_UPLOAD_FILES`, `FG_MAX_FILE_BYTES`).
 
-**Solution**:
+### Network Errors
 
-1. Verify `FLAKEGUARD_API_KEY` secret is set in repository settings
-2. Check the API key has not expired in FlakeGuard dashboard
-3. Ensure you're using the correct project slug
-
-### Upload fails with 404 Not Found
-
-**Symptom**: Error "Upload failed with HTTP status 404"
-
-**Solution**:
-
-1. Verify `flakeguard_url` is correct (include protocol: `https://`)
-2. Check the FlakeGuard server is accessible from GitHub Actions
-3. Verify the project slug exists in FlakeGuard
-
-### Upload fails with 413 Payload Too Large
-
-**Symptom**: Error "Upload failed with HTTP status 413"
-
-**Solution**:
-
-1. Check total JUnit file size (default limit: 5MB)
-2. Check individual file size (default limit: 1MB)
-3. Contact FlakeGuard admin to adjust limits: `FG_MAX_UPLOAD_BYTES`, `FG_MAX_FILE_BYTES`
-
-### Connection timeout
-
-**Symptom**: Error "curl command failed"
-
-**Solution**:
-
-1. Verify FlakeGuard server is accessible from GitHub Actions runners
-2. Check firewall/network settings
-3. Try accessing FlakeGuard URL manually: `curl https://flakeguard.example.com`
-
-## Best Practices
-
-1. **Always use `if: always()`**: Upload results even if tests fail - flakes often cause failures
-2. **Use secrets for API key**: Never hardcode API keys - use `${{ secrets.FLAKEGUARD_API_KEY }}`
-3. **Use job variants for matrix builds**: Distinguish results from different configurations
-4. **Upload after each test suite**: For multiple test types, upload separately with different variants
-5. **Check test output paths**: Verify your test framework writes to the expected location
-
-## Security
-
-- API keys are marked as sensitive and will not appear in GitHub Actions logs
-- Use GitHub Secrets to store your FlakeGuard API key
-- API keys are sent via HTTPS with Authorization Bearer header
-
-## Next Steps
-
-- [API Documentation](./api.md) - Learn about FlakeGuard API endpoints
-- [Runbook](./runbook.md) - Operational guide for FlakeGuard
-- [Complete Workflow Example](../examples/github-workflow.yml) - Full working example
+- Verify `flakeguard_url` is reachable from GitHub-hosted runners.
+- Ensure you include the protocol (`https://`).

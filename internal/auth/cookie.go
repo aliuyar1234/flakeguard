@@ -25,13 +25,14 @@ func SetSessionCookie(w http.ResponseWriter, token string, sessionDays int, isPr
 }
 
 // ClearSessionCookie clears the session cookie by setting MaxAge to -1
-func ClearSessionCookie(w http.ResponseWriter) {
+func ClearSessionCookie(w http.ResponseWriter, isProduction bool) {
 	cookie := &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   isProduction,
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)

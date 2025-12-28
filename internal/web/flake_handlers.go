@@ -4,27 +4,35 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/flakeguard/flakeguard/internal/auth"
 	"github.com/flakeguard/flakeguard/internal/flake"
 	"github.com/flakeguard/flakeguard/internal/orgs"
 	"github.com/flakeguard/flakeguard/internal/projects"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
-// HandleFlakesListPage renders the flakes list page for a project
+func truncateRunes(s string, maxRunes int) (string, bool) {
+	runes := []rune(s)
+	if len(runes) <= maxRunes {
+		return s, false
+	}
+	return string(runes[:maxRunes]) + "...", true
+}
+
+// HandleFlakesListPage renders the flakes list page for a project.
 func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		userID := auth.GetUserID(ctx)
 
-		// Get org_slug and project_slug from path
-		orgSlug := r.PathValue("org_slug")
-		projectSlug := r.PathValue("project_slug")
+		orgSlug := chi.URLParam(r, "org_slug")
+		projectSlug := chi.URLParam(r, "project_slug")
 
-		// Get organization by slug
 		orgService := orgs.NewService(pool)
 		org, err := orgService.GetBySlug(ctx, orgSlug)
 		if err != nil {
@@ -37,7 +45,6 @@ func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFun
 			return
 		}
 
-		// Verify user has access to org
 		_, err = orgService.RequireOrgMember(ctx, userID, org.ID)
 		if err != nil {
 			if errors.Is(err, orgs.ErrNotMember) {
@@ -49,7 +56,6 @@ func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFun
 			return
 		}
 
-		// Get project by slug
 		projectService := projects.NewService(pool)
 		project, err := projectService.GetByOrgAndSlug(ctx, org.ID, projectSlug)
 		if err != nil {
@@ -62,8 +68,7 @@ func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFun
 			return
 		}
 
-		// Parse filter parameters
-		days := 30 // Default to 30 days
+		days := 30
 		if daysStr := r.URL.Query().Get("days"); daysStr != "" {
 			if parsed, err := strconv.Atoi(daysStr); err == nil && parsed > 0 {
 				days = parsed
@@ -73,16 +78,14 @@ func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFun
 		repo := r.URL.Query().Get("repo")
 		jobName := r.URL.Query().Get("job_name")
 
-		// Build request for service
 		req := flake.ListFlakesRequest{
 			Days:    days,
 			Repo:    repo,
 			JobName: jobName,
-			Limit:   100, // MVP limit
+			Limit:   100,
 			Offset:  0,
 		}
 
-		// Query flake stats
 		flakeService := flake.NewService(pool)
 		flakes, total, err := flakeService.ListFlakes(ctx, project.ID, req)
 		if err != nil {
@@ -91,22 +94,21 @@ func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFun
 			return
 		}
 
-		// Generate CSRF token
 		csrfToken, err := auth.GenerateCSRFToken()
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-
-		// Set CSRF cookie
 		auth.SetCSRFCookie(w, csrfToken, isProduction)
 
-		// Render flakes list page
 		data := &TemplateData{
-			Title:     "Flaky Tests - " + project.Name,
-			UserID:    userID,
-			CSRFToken: csrfToken,
+			Title:           "Flaky Tests - " + project.Name,
+			UserID:          userID,
+			IsAuthenticated: true,
+			CSRFToken:       csrfToken,
 			Data: map[string]interface{}{
+				"OrgID":       org.ID,
+				"ProjectID":   project.ID,
 				"OrgSlug":     orgSlug,
 				"ProjectSlug": projectSlug,
 				"ProjectName": project.Name,
@@ -121,25 +123,22 @@ func HandleFlakesListPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFun
 	}
 }
 
-// HandleFlakeDetailPage renders the flake detail page
+// HandleFlakeDetailPage renders the flake detail page.
 func HandleFlakeDetailPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		userID := auth.GetUserID(ctx)
 
-		// Get org_slug, project_slug, and test_case_id from path
-		orgSlug := r.PathValue("org_slug")
-		projectSlug := r.PathValue("project_slug")
-		testCaseIDStr := r.PathValue("test_case_id")
+		orgSlug := chi.URLParam(r, "org_slug")
+		projectSlug := chi.URLParam(r, "project_slug")
+		testCaseIDStr := chi.URLParam(r, "test_case_id")
 
-		// Parse test_case_id
 		testCaseID, err := uuid.Parse(testCaseIDStr)
 		if err != nil {
 			http.Error(w, "Invalid test case ID", http.StatusBadRequest)
 			return
 		}
 
-		// Get organization by slug
 		orgService := orgs.NewService(pool)
 		org, err := orgService.GetBySlug(ctx, orgSlug)
 		if err != nil {
@@ -152,7 +151,6 @@ func HandleFlakeDetailPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFu
 			return
 		}
 
-		// Verify user has access to org
 		_, err = orgService.RequireOrgMember(ctx, userID, org.ID)
 		if err != nil {
 			if errors.Is(err, orgs.ErrNotMember) {
@@ -164,7 +162,6 @@ func HandleFlakeDetailPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFu
 			return
 		}
 
-		// Get project by slug
 		projectService := projects.NewService(pool)
 		project, err := projectService.GetByOrgAndSlug(ctx, org.ID, projectSlug)
 		if err != nil {
@@ -177,11 +174,17 @@ func HandleFlakeDetailPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFu
 			return
 		}
 
-		// Query flake detail
+		days := 30
+		if daysStr := r.URL.Query().Get("days"); daysStr != "" {
+			if parsed, err := strconv.Atoi(daysStr); err == nil && parsed > 0 {
+				days = parsed
+			}
+		}
+
 		flakeService := flake.NewService(pool)
-		detail, evidenceTotal, err := flakeService.GetFlakeDetail(ctx, project.ID, testCaseID, 100, 0)
+		detail, evidenceTotal, err := flakeService.GetFlakeDetail(ctx, project.ID, testCaseID, days, 100, 0)
 		if err != nil {
-			if err.Error() == "flake not found" {
+			if errors.Is(err, flake.ErrFlakeNotFound) {
 				http.Error(w, "Flake not found", http.StatusNotFound)
 				return
 			}
@@ -193,27 +196,39 @@ func HandleFlakeDetailPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFu
 			return
 		}
 
-		// Generate CSRF token
+		lastFailureDisplay := ""
+		lastFailureTruncated := false
+		lastFailureIngestionTruncated := false
+		if detail.LastFailureMessage != nil {
+			msg := *detail.LastFailureMessage
+			lastFailureIngestionTruncated = strings.Contains(msg, "[truncated]") || strings.Contains(msg, "(truncated)")
+			lastFailureDisplay, lastFailureTruncated = truncateRunes(msg, 500)
+		}
+
 		csrfToken, err := auth.GenerateCSRFToken()
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-
-		// Set CSRF cookie
 		auth.SetCSRFCookie(w, csrfToken, isProduction)
 
-		// Render flake detail page
 		data := &TemplateData{
-			Title:     "Flake Detail - " + detail.TestIdentifier,
-			UserID:    userID,
-			CSRFToken: csrfToken,
+			Title:           "Flake Detail - " + detail.TestIdentifier,
+			UserID:          userID,
+			IsAuthenticated: true,
+			CSRFToken:       csrfToken,
 			Data: map[string]interface{}{
-				"OrgSlug":       orgSlug,
-				"ProjectSlug":   projectSlug,
-				"ProjectName":   project.Name,
-				"Detail":        detail,
-				"EvidenceTotal": evidenceTotal,
+				"OrgID":                                org.ID,
+				"ProjectID":                            project.ID,
+				"OrgSlug":                              orgSlug,
+				"ProjectSlug":                          projectSlug,
+				"ProjectName":                          project.Name,
+				"Days":                                 days,
+				"Detail":                               detail,
+				"EvidenceTotal":                        evidenceTotal,
+				"LastFailureMessageDisplay":            lastFailureDisplay,
+				"LastFailureMessageTruncated":          lastFailureTruncated,
+				"LastFailureMessageIngestionTruncated": lastFailureIngestionTruncated,
 			},
 		}
 		RenderTemplate(w, r, "flake_detail.html", data)

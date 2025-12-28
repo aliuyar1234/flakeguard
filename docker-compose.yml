@@ -1,39 +1,28 @@
-version: '3.8'
-
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      FG_DATABASE_DSN: "postgres://flakeguard:flakeguard@postgres:5432/flakeguard?sslmode=disable"
-      FG_JWT_SECRET: "dev-secret-minimum-32-bytes-required-for-jwt-signing"
-      FG_HTTP_ADDR: ":8080"
-      FG_LOG_LEVEL: "info"
-      FG_ENV: "dev"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  postgres:
+  db:
     image: postgres:16.4-alpine
     environment:
-      POSTGRES_USER: flakeguard
-      POSTGRES_PASSWORD: flakeguard
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
       POSTGRES_DB: flakeguard
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flakeguard"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      - fg_db:/var/lib/postgresql/data
+
+  app:
+    build: .
+    environment:
+      FG_ENV: dev
+      FG_HTTP_ADDR: :8080
+      FG_BASE_URL: http://localhost:8080
+      FG_DB_DSN: postgres://postgres:postgres@db:5432/flakeguard?sslmode=disable
+      FG_JWT_SECRET: change-me-in-dev-please-change
+      FG_LOG_LEVEL: debug
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
 
 volumes:
-  postgres_data:
+  fg_db: {}

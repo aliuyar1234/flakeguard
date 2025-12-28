@@ -10,17 +10,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Event types for audit logging
 const (
+	EventUserSignup      = "user.signup"
+	EventLoginFailed     = "auth.login_failed"
 	EventOrgCreated      = "org.created"
 	EventProjectCreated  = "project.created"
 	EventAPIKeyCreated   = "apikey.created"
 	EventAPIKeyRevoked   = "apikey.revoked"
 	EventSlackConfigured = "slack.configured"
-	EventSlackRemoved    = "slack.removed"
+	EventSlackCleared    = "slack.cleared"
 )
 
-// Event represents an audit log entry
+// Event represents an audit log entry.
 type Event struct {
 	ID          uuid.UUID              `db:"id"`
 	OrgID       uuid.NullUUID          `db:"org_id"`
@@ -31,17 +32,16 @@ type Event struct {
 	CreatedAt   time.Time              `db:"created_at"`
 }
 
-// Writer provides methods to write audit log entries
+// Writer provides methods to write audit log entries.
 type Writer struct {
 	pool *pgxpool.Pool
 }
 
-// NewWriter creates a new audit log writer
 func NewWriter(pool *pgxpool.Pool) *Writer {
 	return &Writer{pool: pool}
 }
 
-// LogParams contains parameters for logging an audit event
+// LogParams contains parameters for logging an audit event.
 type LogParams struct {
 	OrgID       *uuid.UUID
 	ProjectID   *uuid.UUID
@@ -50,19 +50,15 @@ type LogParams struct {
 	Meta        map[string]interface{}
 }
 
-// Log writes an audit log entry to the database
 func (w *Writer) Log(ctx context.Context, params LogParams) error {
-	// Convert meta to JSON (always set, default to empty object)
-	var metaJSON []byte
-	var err error
+	metaJSON := []byte("{}")
 	if params.Meta != nil {
-		metaJSON, err = json.Marshal(params.Meta)
+		b, err := json.Marshal(params.Meta)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to marshal audit meta")
 			return err
 		}
-	} else {
-		metaJSON = []byte("{}")
+		metaJSON = b
 	}
 
 	query := `
@@ -70,14 +66,11 @@ func (w *Writer) Log(ctx context.Context, params LogParams) error {
 		VALUES ($1, $2, $3, $4, $5)
 	`
 
-	_, err = w.pool.Exec(ctx, query,
-		params.OrgID,
-		params.ProjectID,
-		params.ActorUserID,
-		params.Action,
-		metaJSON,
-	)
+	orgID := toNullUUID(params.OrgID)
+	projectID := toNullUUID(params.ProjectID)
+	actorUserID := toNullUUID(params.ActorUserID)
 
+	_, err := w.pool.Exec(ctx, query, orgID, projectID, actorUserID, params.Action, metaJSON)
 	if err != nil {
 		log.Error().Err(err).Str("action", params.Action).Msg("Failed to write audit log")
 		return err
@@ -93,7 +86,33 @@ func (w *Writer) Log(ctx context.Context, params LogParams) error {
 	return nil
 }
 
-// LogOrgCreated logs an organization creation event
+func toNullUUID(id *uuid.UUID) uuid.NullUUID {
+	if id == nil {
+		return uuid.NullUUID{}
+	}
+	return uuid.NullUUID{UUID: *id, Valid: true}
+}
+
+func (w *Writer) LogUserSignup(ctx context.Context, userID uuid.UUID, email string) error {
+	return w.Log(ctx, LogParams{
+		ActorUserID: &userID,
+		Action:      EventUserSignup,
+		Meta: map[string]interface{}{
+			"email": email,
+		},
+	})
+}
+
+func (w *Writer) LogLoginFailed(ctx context.Context, email, ip string) error {
+	return w.Log(ctx, LogParams{
+		Action: EventLoginFailed,
+		Meta: map[string]interface{}{
+			"email": email,
+			"ip":    ip,
+		},
+	})
+}
+
 func (w *Writer) LogOrgCreated(ctx context.Context, orgID, userID uuid.UUID, slug string) error {
 	return w.Log(ctx, LogParams{
 		OrgID:       &orgID,
@@ -105,7 +124,6 @@ func (w *Writer) LogOrgCreated(ctx context.Context, orgID, userID uuid.UUID, slu
 	})
 }
 
-// LogProjectCreated logs a project creation event
 func (w *Writer) LogProjectCreated(ctx context.Context, orgID, projectID, userID uuid.UUID, slug string) error {
 	return w.Log(ctx, LogParams{
 		OrgID:       &orgID,
@@ -118,7 +136,6 @@ func (w *Writer) LogProjectCreated(ctx context.Context, orgID, projectID, userID
 	})
 }
 
-// LogAPIKeyCreated logs an API key creation event
 func (w *Writer) LogAPIKeyCreated(ctx context.Context, orgID, projectID, apiKeyID, userID uuid.UUID, name string) error {
 	return w.Log(ctx, LogParams{
 		OrgID:       &orgID,
@@ -131,7 +148,6 @@ func (w *Writer) LogAPIKeyCreated(ctx context.Context, orgID, projectID, apiKeyI
 	})
 }
 
-// LogAPIKeyRevoked logs an API key revocation event
 func (w *Writer) LogAPIKeyRevoked(ctx context.Context, orgID, projectID, apiKeyID, userID uuid.UUID, name string) error {
 	return w.Log(ctx, LogParams{
 		OrgID:       &orgID,
@@ -144,7 +160,6 @@ func (w *Writer) LogAPIKeyRevoked(ctx context.Context, orgID, projectID, apiKeyI
 	})
 }
 
-// LogSlackConfigured logs a Slack webhook configuration event
 func (w *Writer) LogSlackConfigured(ctx context.Context, orgID, projectID, userID uuid.UUID) error {
 	return w.Log(ctx, LogParams{
 		OrgID:       &orgID,
@@ -155,13 +170,17 @@ func (w *Writer) LogSlackConfigured(ctx context.Context, orgID, projectID, userI
 	})
 }
 
-// LogSlackRemoved logs a Slack webhook removal event
-func (w *Writer) LogSlackRemoved(ctx context.Context, orgID, projectID, userID uuid.UUID) error {
+func (w *Writer) LogSlackCleared(ctx context.Context, orgID, projectID, userID uuid.UUID) error {
 	return w.Log(ctx, LogParams{
 		OrgID:       &orgID,
 		ProjectID:   &projectID,
 		ActorUserID: &userID,
-		Action:      EventSlackRemoved,
+		Action:      EventSlackCleared,
 		Meta:        map[string]interface{}{},
 	})
+}
+
+// LogSlackRemoved is kept for backward compatibility.
+func (w *Writer) LogSlackRemoved(ctx context.Context, orgID, projectID, userID uuid.UUID) error {
+	return w.LogSlackCleared(ctx, orgID, projectID, userID)
 }

@@ -33,8 +33,9 @@ func HandleSignupPage(isProduction bool) http.HandlerFunc {
 
 		// Render signup page
 		data := &TemplateData{
-			Title:     "Sign Up",
-			CSRFToken: csrfToken,
+			Title:           "Sign Up",
+			IsAuthenticated: false,
+			CSRFToken:       csrfToken,
 		}
 		RenderTemplate(w, r, "signup.html", data)
 	}
@@ -63,8 +64,9 @@ func HandleLoginPage(isProduction bool) http.HandlerFunc {
 
 		// Render login page
 		data := &TemplateData{
-			Title:     "Log In",
-			CSRFToken: csrfToken,
+			Title:           "Log In",
+			IsAuthenticated: false,
+			CSRFToken:       csrfToken,
 		}
 		RenderTemplate(w, r, "login.html", data)
 	}
@@ -92,10 +94,11 @@ func HandleOrgsPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFunc {
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to list organizations")
 			data := &TemplateData{
-				Title:     "Organizations",
-				UserID:    userID,
-				CSRFToken: csrfToken,
-				Error:     "Failed to load organizations",
+				Title:           "Organizations",
+				UserID:          userID,
+				IsAuthenticated: true,
+				CSRFToken:       csrfToken,
+				Error:           "Failed to load organizations",
 			}
 			RenderTemplate(w, r, "org_list.html", data)
 			return
@@ -103,9 +106,10 @@ func HandleOrgsPage(pool *pgxpool.Pool, isProduction bool) http.HandlerFunc {
 
 		// Render organizations page
 		data := &TemplateData{
-			Title:     "Organizations",
-			UserID:    userID,
-			CSRFToken: csrfToken,
+			Title:           "Organizations",
+			UserID:          userID,
+			IsAuthenticated: true,
+			CSRFToken:       csrfToken,
 			Data: map[string]interface{}{
 				"Orgs": orgsList,
 			},
@@ -131,9 +135,10 @@ func HandleOrgCreatePage(isProduction bool) http.HandlerFunc {
 
 		// Render org create page
 		data := &TemplateData{
-			Title:     "Create Organization",
-			UserID:    userID,
-			CSRFToken: csrfToken,
+			Title:           "Create Organization",
+			UserID:          userID,
+			IsAuthenticated: true,
+			CSRFToken:       csrfToken,
 		}
 		RenderTemplate(w, r, "org_create.html", data)
 	}

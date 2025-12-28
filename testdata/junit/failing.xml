@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="FailingTests" tests="2" failures="2" errors="0" skipped="0" time="0.234">
+    <testcase classname="com.example.PaymentTest" name="testProcessPayment" time="0.123">
+      <failure message="Expected payment to succeed but got error">
+AssertionError: Expected payment to succeed but got error
+  at com.example.PaymentTest.testProcessPayment(PaymentTest.java:45)
+  at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+      </failure>
+    </testcase>
+    <testcase classname="com.example.ValidationTest" name="testEmailValidation" time="0.111">
+      <failure message="Invalid email should be rejected">
+Expected validation to fail for invalid@
+Got: validation passed
+      </failure>
+    </testcase>
+  </testsuite>
+</testsuites>

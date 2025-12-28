@@ -1,11 +1,16 @@
 {{define "content"}}
 <div>
-    <div style="margin-bottom: 1.5rem;">
-        <a href="/orgs/{{.OrgID}}/projects" style="color: #3498db; text-decoration: none;">&larr; Back to Projects</a>
+    <div class="mb-1">
+        <a href="/orgs/{{.Data.OrgID}}/projects" class="link">&larr; Back to Projects</a>
     </div>
 
-    <h2>{{.ProjectName}} Settings</h2>
-    <p style="color: #666; margin-bottom: 2rem;">Manage settings for this project</p>
+    <div class="page-header mb-2">
+        <div>
+            <h2 class="mb-1">{{.Data.ProjectName}} Settings</h2>
+            <p class="text-muted mb-0">Manage settings for this project</p>
+        </div>
+        <a href="/orgs/{{.Data.OrgSlug}}/projects/{{.Data.ProjectSlug}}/flakes" class="btn btn-primary">View Flaky Tests</a>
+    </div>
 
     {{if .Error}}
     <div class="error">{{.Error}}</div>
@@ -15,108 +20,154 @@
     <div class="success">{{.Success}}</div>
     {{end}}
 
-    <!-- Project Details -->
-    <section style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #ddd;">
-        <h3 style="margin-bottom: 1rem; color: #2c3e50;">Project Details</h3>
-        <div style="background-color: #fafafa; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
-            <p style="margin-bottom: 0.5rem;"><strong>Name:</strong> {{.ProjectName}}</p>
-            <p style="margin-bottom: 0.5rem;"><strong>Slug:</strong> <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.ProjectSlug}}</code></p>
-            <p style="margin-bottom: 0;"><strong>Default Branch:</strong> <code style="background-color: #eee; padding: 0.2rem 0.5rem; border-radius: 3px;">{{.DefaultBranch}}</code></p>
+    <section class="mb-2">
+        <h3>Project Details</h3>
+        <div class="card">
+            <div class="card-row">
+                <div>
+                    <div class="mb-1"><strong>Name:</strong> {{.Data.ProjectName}}</div>
+                    <div class="text-muted mb-1">Slug: <span class="code-pill">{{.Data.ProjectSlug}}</span></div>
+                    <div class="text-muted">Default branch: <span class="code-pill">{{.Data.DefaultBranch}}</span></div>
+                </div>
+            </div>
         </div>
-        <a href="/orgs/{{.OrgSlug}}/projects/{{.ProjectSlug}}/flakes" style="display: inline-block; padding: 0.75rem 1.5rem; background-color: #3498db; color: white; text-decoration: none; border-radius: 4px; font-weight: 500;">
-            View Flaky Tests Dashboard
-        </a>
     </section>
 
-    <!-- API Keys -->
-    <section style="margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #ddd;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="margin-bottom: 0; color: #2c3e50;">API Keys</h3>
-            {{if .CanMutate}}
-            <button onclick="document.getElementById('createKeyForm').style.display='block'" style="background-color: #3498db; color: white; padding: 0.5rem 1rem; border-radius: 4px; border: none; cursor: pointer; font-size: 0.9rem;">Create API Key</button>
-            {{end}}
-        </div>
+    <section class="mb-2">
+        <h3>API Keys</h3>
 
-        <!-- Create API Key Form (hidden by default) -->
-        <div id="createKeyForm" style="display: none; background-color: #f0f8ff; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
-            <h4 style="margin-bottom: 1rem;">Create New API Key</h4>
-            <form method="POST" action="/api/v1/projects/{{.ProjectID}}/api-keys">
-                <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-                <div class="form-group">
-                    <label for="key_name">Key Name</label>
-                    <input type="text" id="key_name" name="name" required placeholder="CI Pipeline Key">
-                </div>
-                <div style="display: flex; gap: 1rem;">
-                    <button type="submit">Generate Key</button>
-                    <button type="button" onclick="document.getElementById('createKeyForm').style.display='none'" style="background-color: #95a5a6;">Cancel</button>
-                </div>
-            </form>
-        </div>
+        {{if .Data.CanMutate}}
+        <details class="mb-1">
+            <summary>Create API Key</summary>
+            <div class="card mt-1">
+                <form method="POST" action="/api/v1/projects/{{.Data.ProjectID}}/api-keys" data-json-form data-token-target="#newApiKeyToken" data-token-reveal="#newApiKeyCard">
+                    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
-        {{if .NewAPIKey}}
-        <div style="background-color: #fff3cd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border-left: 4px solid #ffc107;">
-            <h4 style="margin-bottom: 0.5rem; color: #856404;">API Key Created!</h4>
-            <p style="color: #856404; margin-bottom: 1rem;">Save this key now - you won't be able to see it again!</p>
-            <code style="display: block; background-color: #fff; padding: 1rem; border-radius: 4px; font-family: monospace; word-break: break-all; border: 1px solid #ffc107;">{{.NewAPIKey}}</code>
+                    <div class="form-group">
+                        <label for="key_name">Key Name</label>
+                        <input type="text" id="key_name" name="name" required placeholder="github-actions-uploader">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Scopes</label>
+                        <label>
+                            <input type="checkbox" name="scopes" value="ingest:write" checked>
+                            ingest:write
+                        </label>
+                        <label>
+                            <input type="checkbox" name="scopes" value="read:project">
+                            read:project
+                        </label>
+                        <small class="helper-text">Ingest requires ingest:write.</small>
+                    </div>
+
+                    <div class="button-row">
+                        <button type="submit" class="btn btn-primary">Generate Key</button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
+        <div id="newApiKeyCard" class="card hidden mb-1">
+            <h3 class="mb-1">API Key Created</h3>
+            <p class="text-muted mb-1">Save this key now - you won't be able to see it again.</p>
+            <pre id="newApiKeyToken" class="code-block"></pre>
+            <div class="button-row mt-1">
+                <a href="/orgs/{{.Data.OrgID}}/projects/{{.Data.ProjectID}}/settings" class="btn btn-secondary btn-sm">Reload Settings</a>
+            </div>
         </div>
         {{end}}
 
-        {{if .APIKeys}}
-        <div style="background-color: #fafafa; padding: 1rem; border-radius: 4px;">
-            {{range .APIKeys}}
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; margin-bottom: 0.5rem; background-color: white; border-radius: 4px; border: 1px solid #ddd;">
-                <div>
-                    <strong>{{.Name}}</strong>
-                    <p style="color: #666; margin: 0.25rem 0 0 0; font-size: 0.9rem;">
-                        Created: {{.CreatedAt.Format "2006-01-02 15:04:05"}}
-                        {{if .RevokedAt}} | <span style="color: #c33;">Revoked</span>{{end}}
-                    </p>
+        {{if .Data.APIKeys}}
+        <div class="card-grid">
+            {{range .Data.APIKeys}}
+            <div class="card">
+                <div class="card-row">
+                    <div>
+                        <h3 class="mb-1">{{.Name}}</h3>
+                        <div class="text-muted mb-1">
+                            Scopes:
+                            {{range $i, $s := .Scopes}}{{if $i}}, {{end}}<span class="code-pill">{{$s}}</span>{{end}}
+                        </div>
+                        <div class="text-muted mb-1">Created: {{.CreatedAt.Format "2006-01-02 15:04"}}</div>
+                        <div class="text-muted">
+                            Last used:
+                            {{if .LastUsedAt}}{{.LastUsedAt.Format "2006-01-02 15:04"}}{{else}}&mdash;{{end}}
+                            {{if .RevokedAt}} | <strong>Revoked</strong>{{end}}
+                        </div>
+                    </div>
+                    <div>
+                        {{if not .RevokedAt}}
+                        {{if $.Data.CanMutate}}
+                        <form method="POST" action="/api/v1/projects/{{$.Data.ProjectID}}/api-keys/{{.ID}}" data-json-form data-confirm="Revoke this API key?" data-reload="true">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        </form>
+                        {{end}}
+                        {{end}}
+                    </div>
                 </div>
-                {{if not .RevokedAt}}
-                {{if $.CanMutate}}
-                <form method="POST" action="/api/v1/projects/{{$.ProjectID}}/api-keys/{{.ID}}/revoke" style="margin: 0;">
-                    <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
-                    <input type="hidden" name="_method" value="DELETE">
-                    <button type="submit" onclick="return confirm('Are you sure you want to revoke this API key?')" style="background-color: #e74c3c; font-size: 0.9rem; padding: 0.5rem 1rem;">Revoke</button>
-                </form>
-                {{end}}
-                {{end}}
             </div>
             {{end}}
         </div>
         {{else}}
-        <p style="color: #666; padding: 1rem; background-color: #fafafa; border-radius: 4px;">No API keys yet.</p>
+        <div class="empty-state">
+            <p class="mb-0">No API keys yet.</p>
+        </div>
         {{end}}
     </section>
 
-    <!-- Slack Integration -->
-    <section style="margin-bottom: 2rem;">
-        <h3 style="margin-bottom: 1rem; color: #2c3e50;">Slack Integration</h3>
+    <section>
+        <h3>Slack Integration</h3>
 
-        {{if .SlackConfigured}}
-        <div style="background-color: #d4edda; padding: 1rem; border-radius: 4px; border-left: 4px solid #28a745; margin-bottom: 1rem;">
-            <p style="color: #155724; margin-bottom: 0;">Slack webhook is configured</p>
+        {{if .Data.SlackWebhookURLSet}}
+        <div class="card mb-1">
+            <div class="text-muted">
+                Webhook URL set. Notifications:
+                {{if .Data.SlackEnabled}}<strong>enabled</strong>{{else}}<strong>disabled</strong>{{end}}
+            </div>
         </div>
-        {{if .CanMutate}}
-        <form method="POST" action="/api/v1/projects/{{.ProjectID}}/slack/remove">
+        {{else}}
+        <div class="empty-state mb-1">
+            <p class="mb-0">Slack integration not configured.</p>
+        </div>
+        {{end}}
+
+        {{if .Data.CanMutate}}
+        <details class="mb-1">
+            <summary>{{if .Data.SlackWebhookURLSet}}Update Slack Webhook{{else}}Configure Slack{{end}}</summary>
+            <div class="card mt-1">
+                <form method="POST" action="/api/v1/projects/{{.Data.ProjectID}}/slack" data-json-form data-reload="true">
+                    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+                    <input type="hidden" name="_method" value="PUT">
+
+                    <div class="form-group">
+                        <label for="webhook_url">Slack Webhook URL</label>
+                        <input type="text" id="webhook_url" name="webhook_url" required placeholder="https://hooks.slack.com/services/...">
+                        <small class="helper-text">The API will never echo the full URL back.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="enabled" checked>
+                            Enable notifications
+                        </label>
+                    </div>
+
+                    <div class="button-row">
+                        <button type="submit" class="btn btn-primary">Save Slack Settings</button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
+        {{if .Data.SlackWebhookURLSet}}
+        <form method="POST" action="/api/v1/projects/{{.Data.ProjectID}}/slack" data-json-form data-confirm="Remove Slack integration?" data-reload="true">
             <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
             <input type="hidden" name="_method" value="DELETE">
-            <button type="submit" onclick="return confirm('Are you sure you want to remove Slack integration?')" style="background-color: #e74c3c;">Remove Slack Integration</button>
+            <button type="submit" class="btn btn-danger">Remove Slack Integration</button>
         </form>
-        {{end}}
-        {{else}}
-        {{if .CanMutate}}
-        <form method="POST" action="/api/v1/projects/{{.ProjectID}}/slack">
-            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
-            <div class="form-group">
-                <label for="webhook_url">Slack Webhook URL</label>
-                <input type="text" id="webhook_url" name="webhook_url" required placeholder="https://hooks.slack.com/services/...">
-                <small style="color: #666; display: block; margin-top: 0.25rem;">Get your webhook URL from Slack's Incoming Webhooks app</small>
-            </div>
-            <button type="submit">Configure Slack</button>
-        </form>
-        {{else}}
-        <p style="color: #666; padding: 1rem; background-color: #fafafa; border-radius: 4px;">Slack integration not configured</p>
         {{end}}
         {{end}}
     </section>

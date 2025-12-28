@@ -5,11 +5,18 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 const (
 	// CSRFCookieName is the name of the CSRF cookie
-	CSRFCookieName = "_csrf"
+	CSRFCookieName = "fg_csrf"
+
+	// CSRFFormFieldName is the name of the hidden form field carrying the CSRF token.
+	CSRFFormFieldName = "_csrf"
+
+	// CSRFHeaderName is the header name carrying the CSRF token (for JSON requests).
+	CSRFHeaderName = "X-CSRF-Token"
 
 	// CSRFTokenBytes is the number of random bytes for CSRF tokens
 	CSRFTokenBytes = 32
@@ -57,14 +64,21 @@ func ValidateCSRF(r *http.Request) error {
 		return fmt.Errorf("missing CSRF cookie")
 	}
 
-	// Get token from form or header
+	// Get token from header (preferred for JSON) or from form field.
 	var formToken string
 	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete {
-		// Try form field first
-		formToken = r.FormValue(CSRFCookieName)
+		// Try header first to avoid consuming JSON request bodies.
+		formToken = r.Header.Get(CSRFHeaderName)
+
 		if formToken == "" {
-			// Fall back to header
-			formToken = r.Header.Get("X-CSRF-Token")
+			contentType := r.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") ||
+				strings.HasPrefix(contentType, "multipart/form-data") {
+				if err := r.ParseForm(); err != nil {
+					return fmt.Errorf("failed to parse form for CSRF validation: %w", err)
+				}
+				formToken = r.FormValue(CSRFFormFieldName)
+			}
 		}
 	}
 
