@@ -40,7 +40,9 @@ func HandleJUnitUpload(pool *pgxpool.Pool, cfg *config.Config, limits UploadLimi
 			apperrors.WriteBadRequest(w, r, "Failed to parse multipart form")
 			return
 		}
-		defer r.MultipartForm.RemoveAll()
+		defer func() {
+			_ = r.MultipartForm.RemoveAll()
+		}()
 
 		metaBytes, err := readMetaBytes(r)
 		if err != nil {

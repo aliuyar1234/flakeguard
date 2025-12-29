@@ -36,7 +36,9 @@ func WriteError(w http.ResponseWriter, r *http.Request, statusCode int, code, me
 		},
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return
+	}
 }
 
 // WriteSuccess writes a success response in the standard envelope format
@@ -49,7 +51,9 @@ func WriteSuccess(w http.ResponseWriter, r *http.Request, statusCode int, data i
 		Data:      data,
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		return
+	}
 }
 
 // WriteServiceUnavailable is a helper for 503 responses

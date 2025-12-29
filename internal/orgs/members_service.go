@@ -18,7 +18,9 @@ func (s *Service) UpdateMemberRole(ctx context.Context, orgID, actorUserID, targ
 	if err != nil {
 		return "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var actorRole OrgRole
 	if err := tx.QueryRow(ctx, `
@@ -107,7 +109,9 @@ func (s *Service) RemoveMember(ctx context.Context, orgID, actorUserID, targetUs
 	if err != nil {
 		return "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var actorRole OrgRole
 	if err := tx.QueryRow(ctx, `

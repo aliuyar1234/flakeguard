@@ -142,7 +142,9 @@ func (s *Service) CreateWithOwner(ctx context.Context, name, slug string, userID
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Create organization
 	var org Org

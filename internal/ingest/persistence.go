@@ -46,7 +46,9 @@ func (s *PersistenceService) PersistIngestion(
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	metaJSON, err := json.Marshal(metadata)
 	if err != nil {

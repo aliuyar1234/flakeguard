@@ -54,7 +54,9 @@ func (s *Service) CreateInvite(ctx context.Context, orgID, actorUserID uuid.UUID
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Revoke any existing open invites for this email in the org.
 	_, err = tx.Exec(ctx, `
@@ -184,7 +186,9 @@ func (s *Service) AcceptInvite(ctx context.Context, token string, userID uuid.UU
 	if err != nil {
 		return uuid.Nil, uuid.Nil, "", fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var invite Invite
 	var acceptedAt *time.Time

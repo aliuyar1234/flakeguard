@@ -61,7 +61,9 @@ func (d *Detector) DetectFlakes(ctx context.Context, projectID, ciRunID uuid.UUI
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Query all test attempts for this run, grouped by test
 	attempts, err := d.getTestAttempts(ctx, tx, ciRunID)
