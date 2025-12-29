@@ -8,7 +8,7 @@ Add this step to your GitHub Actions workflow after running tests:
 
 ```yaml
 - name: Upload test results to FlakeGuard
-  uses: ./action # Or your-org/flakeguard-action@v1 when published
+  uses: aliuyar1234/flakeguard/action@v1
   if: always() # Upload even if tests fail
   with:
     flakeguard_url: 'https://flakeguard.example.com'
@@ -16,6 +16,19 @@ Add this step to your GitHub Actions workflow after running tests:
     api_key: ${{ secrets.FLAKEGUARD_API_KEY }}
     junit_paths: 'test-results/**/*.xml'
 ```
+
+## Versioning strategy
+
+Recommended pinning options:
+
+- Stable major line: `uses: aliuyar1234/flakeguard/action@v1`
+- Specific release: `uses: aliuyar1234/flakeguard/action@v1.2.3`
+- Latest (not recommended for production): `uses: aliuyar1234/flakeguard/action@main`
+
+To publish new versions:
+
+- Create immutable tags like `v1.2.3`.
+- Move the floating major tag `v1` to the latest `v1.x.y`.
 
 ## Inputs
 
@@ -47,7 +60,7 @@ jobs:
       - run: pytest --junit-xml=test-results/junit.xml
 
       - name: Upload to FlakeGuard
-        uses: ./action
+        uses: aliuyar1234/flakeguard/action@v1
         if: always()
         with:
           flakeguard_url: 'https://flakeguard.example.com'
@@ -64,7 +77,7 @@ The action sends a multipart request to `POST /api/v1/ingest/junit`:
 - `meta` (application/json): run metadata derived from the GitHub Actions context
 - `junit` (file): one part per matched JUnit XML file
 
-Metadata includes (SSOT 8.9.1):
+Metadata includes:
 
 - `project_slug`
 - `repo_full_name`

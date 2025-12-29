@@ -1,13 +1,18 @@
-# FlakeGuard API (MVP)
+# FlakeGuard API
 
-This document summarizes the integration endpoints and response envelopes.
+This document summarizes the JSON endpoints and response envelopes.
 
-## Auth
+## Authentication
 
-- **CI/agents**: `Authorization: Bearer <project_api_key>` (scope `ingest:write`)
-- **Dashboard users**: session cookie via `/api/v1/auth/*` (JSON-only endpoints)
+- **CI/agents**: `Authorization: Bearer <project_api_key>` (requires scope `ingest:write`)
+- **Dashboard users**: session cookie via `/api/v1/auth/*`
 
-## Response Envelopes
+Session-protected endpoints require CSRF:
+
+- Cookie: `fg_csrf`
+- Header: `X-CSRF-Token: <value>`
+
+## Response envelopes
 
 Success:
 
@@ -18,8 +23,59 @@ Success:
 Error:
 
 ```json
-{ "error": { "code": "invalid_meta", "message": "meta.branch is required", "request_id": "req_01H..." } }
+{ "error": { "code": "bad_request", "message": "Invalid request body", "request_id": "req_01H..." } }
 ```
+
+## Auth
+
+- `POST /api/v1/auth/signup` (`email`, `password`)
+- `POST /api/v1/auth/login` (`email`, `password`)
+- `POST /api/v1/auth/logout`
+
+## Organizations
+
+- `POST /api/v1/orgs` (create org)
+- `GET /api/v1/orgs` (list orgs)
+
+Members:
+
+- `GET /api/v1/orgs/{org_id}/members`
+- `PUT /api/v1/orgs/{org_id}/members/{user_id}` (update role)
+- `DELETE /api/v1/orgs/{org_id}/members/{user_id}` (remove member / leave)
+
+Invites:
+
+- `POST /api/v1/orgs/{org_id}/invites` (create invite; returns `data.invite.accept_url` once)
+- `GET /api/v1/orgs/{org_id}/invites` (active invites)
+- `DELETE /api/v1/orgs/{org_id}/invites/{invite_id}` (revoke)
+- `POST /api/v1/orgs/invites/accept` (accept invite; requires logged-in user)
+
+Audit:
+
+- `GET /api/v1/orgs/{org_id}/audit?limit=50` (OWNER/ADMIN)
+
+## Projects
+
+Under an org:
+
+- `POST /api/v1/orgs/{org_id}/projects` (create project)
+- `GET /api/v1/orgs/{org_id}/projects` (list projects)
+
+Project settings:
+
+- `PUT /api/v1/projects/{project_id}/slack`
+- `DELETE /api/v1/projects/{project_id}/slack`
+
+API keys:
+
+- `POST /api/v1/projects/{project_id}/api-keys`
+- `GET /api/v1/projects/{project_id}/api-keys`
+- `DELETE /api/v1/projects/{project_id}/api-keys/{api_key_id}`
+
+Flakes:
+
+- `GET /api/v1/projects/{project_id}/flakes?days=30&repo=...&job_name=...`
+- `GET /api/v1/projects/{project_id}/flakes/{test_case_id}?days=30`
 
 ## Ingestion
 
@@ -44,23 +100,3 @@ Response: `202 Accepted`
   }
 }
 ```
-
-## Dashboard (Read)
-
-### GET `/api/v1/projects/{project_id}/flakes`
-
-Query params:
-
-- `days` (int)
-- `repo` (string)
-- `job_name` (string)
-
-Response: `200 OK` with `data.flakes[]`.
-
-### GET `/api/v1/projects/{project_id}/flakes/{test_case_id}`
-
-Query params:
-
-- `days` (int)
-
-Response: `200 OK` with `data.flake` and `data.flake.evidence[]`.

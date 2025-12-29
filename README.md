@@ -10,7 +10,7 @@ Add this step to your workflow after running tests:
 
 ```yaml
 - name: Upload test results to FlakeGuard
-  uses: ./action # Or your-org/flakeguard-action@v1 when published
+  uses: aliuyar1234/flakeguard/action@v1
   if: always() # Upload even if tests fail
   with:
     flakeguard_url: 'https://flakeguard.example.com'

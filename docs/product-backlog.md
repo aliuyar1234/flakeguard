@@ -5,32 +5,32 @@ This is a public, high-signal checklist of work that would make FlakeGuard feel 
 ## P0 — Must‑Have Before “proud to publish”
 
 ### Open source hygiene
-- [ ] Pick a license and add `LICENSE` (MIT/Apache-2.0/etc).
-- [ ] Add `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md`.
-- [ ] Add `.github/ISSUE_TEMPLATE/*` + `.github/pull_request_template.md`.
-- [ ] Add a “Support” section (how to report bugs, security issues, and feature requests).
+- [x] Pick a license and add `LICENSE` (MIT/Apache-2.0/etc).
+- [x] Add `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md`.
+- [x] Add `.github/ISSUE_TEMPLATE/*` + `.github/pull_request_template.md`.
+- [x] Add a “Support” section (how to report bugs, security issues, and feature requests).
 
 ### CI / quality gates
-- [ ] Add GitHub Actions CI: `go test ./...`, `go vet ./...`, `gofmt -l`, and `docker build`.
-- [ ] Add linting (`golangci-lint`) and enforce it in CI.
-- [ ] Add ShellCheck for `action/*.sh`.
-- [ ] Add a minimal “smoke” integration job that boots Postgres and runs integration tests.
+- [x] Add GitHub Actions CI: `go test ./...`, `go vet ./...`, `gofmt -l`, and `docker build`.
+- [x] Add linting (`golangci-lint`) and enforce it in CI.
+- [x] Add ShellCheck for `action/*.sh`.
+- [x] Add a minimal “smoke” integration job that boots Postgres and runs integration tests.
 
 ### Public docs completeness
-- [ ] Update `docs/api.md` to include the new org settings endpoints (invites/members/audit).
-- [ ] Add `docs/development.md` (local dev, tests, migrations, env vars).
-- [ ] Add `docs/deployment.md` (prod guidance: TLS, migrations, backups, upgrades).
-- [ ] Document the GitHub Action versioning strategy (`uses: owner/repo@vX`).
+- [x] Update `docs/api.md` to include the new org settings endpoints (invites/members/audit).
+- [x] Add `docs/development.md` (local dev, tests, migrations, env vars).
+- [x] Add `docs/deployment.md` (prod guidance: TLS, migrations, backups, upgrades).
+- [x] Document the GitHub Action versioning strategy (`uses: owner/repo@vX`).
 
 ### Critical test coverage gaps
 - [ ] Add integration tests for: org invites flow (create → accept), member role changes, member removal, and “last OWNER” guardrails.
 - [ ] Add tests for audit entries for invites/membership changes.
 
 ### Repo/module identity
-- [ ] Decide on the canonical Go module path:
+- [x] Decide on the canonical Go module path:
   - Option A: move repo to `github.com/flakeguard/flakeguard`
   - Option B: change `go.mod` + all imports to match the current GitHub repo path (`github.com/aliuyar1234/flakeguard`)
-- [ ] Ensure README examples match the chosen repo/module path.
+- [x] Ensure README examples match the chosen repo/module path.
 
 ## P1 — Strong product polish (high value)
 
