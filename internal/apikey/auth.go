@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/aliuyar1234/flakeguard/internal/apikeys"
 	"github.com/google/uuid"
@@ -22,6 +23,9 @@ var (
 
 	// ErrRevokedAPIKey is returned when the API key has been revoked
 	ErrRevokedAPIKey = errors.New("API key has been revoked")
+
+	// ErrExpiredAPIKey is returned when the API key has expired
+	ErrExpiredAPIKey = errors.New("API key has expired")
 
 	// ErrInsufficientScope is returned when the API key doesn't have required scope
 	ErrInsufficientScope = errors.New("API key does not have required scope")
@@ -84,6 +88,11 @@ func ValidateAPIKey(ctx context.Context, pool *pgxpool.Pool, token string) (*api
 	// Check if revoked
 	if key.RevokedAt.Valid {
 		return nil, ErrRevokedAPIKey
+	}
+
+	// Check if expired
+	if key.ExpiresAt.Valid && !key.ExpiresAt.Time.After(time.Now()) {
+		return nil, ErrExpiredAPIKey
 	}
 
 	return key, nil

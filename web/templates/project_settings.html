@@ -61,6 +61,12 @@
                         <small class="helper-text">Ingest requires ingest:write.</small>
                     </div>
 
+                    <div class="form-group">
+                        <label for="expires_in_days">Expires in (days)</label>
+                        <input type="number" id="expires_in_days" name="expires_in_days" min="0" placeholder="0 (never)">
+                        <small class="helper-text">0 = never expires.</small>
+                    </div>
+
                     <div class="button-row">
                         <button type="submit" class="btn btn-primary">Generate Key</button>
                     </div>
@@ -90,6 +96,11 @@
                             {{range $i, $s := .Scopes}}{{if $i}}, {{end}}<span class="code-pill">{{$s}}</span>{{end}}
                         </div>
                         <div class="text-muted mb-1">Created: {{.CreatedAt.Format "2006-01-02 15:04"}}</div>
+                        <div class="text-muted mb-1">
+                            Expires:
+                            {{if .ExpiresAt}}{{.ExpiresAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}
+                            {{if .Expired}} | <strong>Expired</strong>{{end}}
+                        </div>
                         <div class="text-muted">
                             Last used:
                             {{if .LastUsedAt}}{{.LastUsedAt.Format "2006-01-02 15:04"}}{{else}}&mdash;{{end}}
@@ -99,6 +110,10 @@
                     <div>
                         {{if not .RevokedAt}}
                         {{if $.Data.CanMutate}}
+                        <form method="POST" action="/api/v1/projects/{{$.Data.ProjectID}}/api-keys/{{.ID}}/rotate" data-json-form data-confirm="Rotate this API key? This will revoke the old key." data-token-target="#newApiKeyToken" data-token-reveal="#newApiKeyCard">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <button type="submit" class="btn btn-secondary btn-sm mb-1">Rotate</button>
+                        </form>
                         <form method="POST" action="/api/v1/projects/{{$.Data.ProjectID}}/api-keys/{{.ID}}" data-json-form data-confirm="Revoke this API key?" data-reload="true">
                             <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
                             <input type="hidden" name="_method" value="DELETE">

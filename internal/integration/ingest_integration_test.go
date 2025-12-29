@@ -45,7 +45,7 @@ func TestIntegration_IngestEndpointWritesRowsAndUpdatesFlakeStats(t *testing.T) 
 	require.NoError(t, err)
 
 	apiKeyService := apikeys.NewService(pool)
-	_, token, err := apiKeyService.Create(ctx, project.ID, "CI", []apikeys.ApiKeyScope{apikeys.ScopeIngestWrite}, userID)
+	_, token, err := apiKeyService.Create(ctx, project.ID, "CI", []apikeys.ApiKeyScope{apikeys.ScopeIngestWrite}, userID, nil)
 	require.NoError(t, err)
 
 	cfg := &config.Config{

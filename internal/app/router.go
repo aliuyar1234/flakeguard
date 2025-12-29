@@ -27,10 +27,10 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 	isProduction := !cfg.IsDev()
 
 	// Middleware stack
-	r.Use(middleware.RealIP)         // Set RemoteAddr to real IP
-	r.Use(RequestIDMiddleware)       // Add request ID to context
-	r.Use(LoggingMiddleware)         // Structured request logging
-	r.Use(RecoveryMiddleware)        // Recover from panics
+	r.Use(middleware.RealIP)   // Set RemoteAddr to real IP
+	r.Use(RequestIDMiddleware) // Add request ID to context
+	r.Use(LoggingMiddleware)   // Structured request logging
+	r.Use(RecoveryMiddleware)  // Recover from panics
 	r.Use(SecurityHeadersMiddleware(isProduction))
 	r.Use(cors.Handler(cors.Options{ // CORS (pinned dep)
 		AllowedOrigins:   []string{cfg.BaseURL},
@@ -116,6 +116,7 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 		r.Post("/{project_id}/api-keys", apikeys.HandleCreate(pool, auditor))
 		r.Get("/{project_id}/api-keys", apikeys.HandleList(pool))
 		r.Delete("/{project_id}/api-keys/{api_key_id}", apikeys.HandleRevoke(pool, auditor))
+		r.Post("/{project_id}/api-keys/{api_key_id}/rotate", apikeys.HandleRotate(pool, auditor))
 
 		// Flakes
 		r.Get("/{project_id}/flakes", flake.HandleListFlakes(pool))

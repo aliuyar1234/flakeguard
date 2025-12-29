@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/aliuyar1234/flakeguard/internal/apperrors"
 	"github.com/aliuyar1234/flakeguard/internal/audit"
@@ -50,7 +51,30 @@ func HandleListAudit(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		reader := audit.NewReader(pool)
-		events, err := reader.ListByOrg(ctx, orgID, limit)
+		offset := 0
+		if raw := r.URL.Query().Get("offset"); raw != "" {
+			if v, err := strconv.Atoi(raw); err == nil {
+				offset = v
+			}
+		}
+
+		action := strings.TrimSpace(r.URL.Query().Get("action"))
+		actor := strings.TrimSpace(r.URL.Query().Get("actor"))
+
+		var actorUserID *uuid.UUID
+		if raw := strings.TrimSpace(r.URL.Query().Get("actor_user_id")); raw != "" {
+			if parsed, err := uuid.Parse(raw); err == nil {
+				actorUserID = &parsed
+			}
+		}
+
+		events, total, err := reader.ListByOrgPage(ctx, orgID, audit.ListByOrgOptions{
+			Limit:       limit,
+			Offset:      offset,
+			Action:      action,
+			ActorEmail:  actor,
+			ActorUserID: actorUserID,
+		})
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to list audit log")
 			apperrors.WriteInternalError(w, r, "Failed to list audit log")
@@ -58,7 +82,11 @@ func HandleListAudit(pool *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		apperrors.WriteSuccess(w, r, http.StatusOK, map[string]any{
-			"events": events,
+			"events":  events,
+			"total":   total,
+			"limit":   limit,
+			"offset":  offset,
+			"filters": map[string]any{"action": action, "actor": actor, "actor_user_id": actorUserID},
 		})
 	}
 }

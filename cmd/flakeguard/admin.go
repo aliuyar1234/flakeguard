@@ -136,4 +136,3 @@ func generatePassword(bytesLen int) (string, error) {
 	// URL-safe, printable, without padding.
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
-

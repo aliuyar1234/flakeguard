@@ -8,6 +8,7 @@ Operational notes for running and maintaining FlakeGuard.
 
 - Go to the dashboard: Organizations → Projects → Project Settings → API Keys.
 - Create a key and copy the token (it is shown only once).
+- Optionally set an expiration (in days). Expired keys return `401 expired_api_key`.
 - Store it in CI secrets (e.g., `secrets.FLAKEGUARD_API_KEY`).
 
 ### Rotate a Key

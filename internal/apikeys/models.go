@@ -22,6 +22,7 @@ type ApiKey struct {
 	Name            string       `db:"name"`
 	TokenHash       []byte       `db:"token_hash"`
 	Scopes          []string     `db:"scopes"`
+	ExpiresAt       sql.NullTime `db:"expires_at"`
 	RevokedAt       sql.NullTime `db:"revoked_at"`
 	LastUsedAt      sql.NullTime `db:"last_used_at"`
 	CreatedByUserID uuid.UUID    `db:"created_by_user_id"`
@@ -34,17 +35,22 @@ func (k *ApiKey) IsRevoked() bool {
 	return k.RevokedAt.Valid
 }
 
+func (k *ApiKey) IsExpired() bool {
+	return k.ExpiresAt.Valid && !k.ExpiresAt.Time.After(time.Now())
+}
+
 // IsActive returns true if the API key is active (not revoked)
 func (k *ApiKey) IsActive() bool {
-	return !k.IsRevoked()
+	return !k.IsRevoked() && !k.IsExpired()
 }
 
 type ApiKeyCreatedResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Scopes    []string  `json:"scopes"`
-	Token     string    `json:"token"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID  `json:"id"`
+	Name      string     `json:"name"`
+	Scopes    []string   `json:"scopes"`
+	Token     string     `json:"token"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 type ApiKeyListItemResponse struct {
@@ -52,18 +58,24 @@ type ApiKeyListItemResponse struct {
 	Name       string     `json:"name"`
 	Scopes     []string   `json:"scopes"`
 	CreatedAt  time.Time  `json:"created_at"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	Expired    bool       `json:"expired"`
 	RevokedAt  *time.Time `json:"revoked_at"`
 	LastUsedAt *time.Time `json:"last_used_at"`
 }
 
 func (k *ApiKey) ToCreatedResponse(token string) ApiKeyCreatedResponse {
-	return ApiKeyCreatedResponse{
+	resp := ApiKeyCreatedResponse{
 		ID:        k.ID,
 		Name:      k.Name,
 		Scopes:    append([]string(nil), k.Scopes...),
 		Token:     token,
 		CreatedAt: k.CreatedAt,
 	}
+	if k.ExpiresAt.Valid {
+		resp.ExpiresAt = &k.ExpiresAt.Time
+	}
+	return resp
 }
 
 func (k *ApiKey) ToListItemResponse() ApiKeyListItemResponse {
@@ -72,6 +84,10 @@ func (k *ApiKey) ToListItemResponse() ApiKeyListItemResponse {
 		Name:      k.Name,
 		Scopes:    append([]string(nil), k.Scopes...),
 		CreatedAt: k.CreatedAt,
+	}
+	if k.ExpiresAt.Valid {
+		resp.ExpiresAt = &k.ExpiresAt.Time
+		resp.Expired = !k.ExpiresAt.Time.After(time.Now())
 	}
 	if k.RevokedAt.Valid {
 		resp.RevokedAt = &k.RevokedAt.Time

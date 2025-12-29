@@ -22,6 +22,7 @@ const (
 	EventProjectCreated       = "project.created"
 	EventAPIKeyCreated        = "apikey.created"
 	EventAPIKeyRevoked        = "apikey.revoked"
+	EventAPIKeyRotated        = "apikey.rotated"
 	EventSlackConfigured      = "slack.configured"
 	EventSlackCleared         = "slack.cleared"
 )
@@ -221,6 +222,21 @@ func (w *Writer) LogAPIKeyRevoked(ctx context.Context, orgID, projectID, apiKeyI
 		Action:      EventAPIKeyRevoked,
 		Meta: map[string]interface{}{
 			"name": name,
+		},
+	})
+}
+
+func (w *Writer) LogAPIKeyRotated(ctx context.Context, orgID, projectID, oldAPIKeyID, newAPIKeyID, userID uuid.UUID, oldName, newName string) error {
+	return w.Log(ctx, LogParams{
+		OrgID:       &orgID,
+		ProjectID:   &projectID,
+		ActorUserID: &userID,
+		Action:      EventAPIKeyRotated,
+		Meta: map[string]interface{}{
+			"old_api_key_id": oldAPIKeyID.String(),
+			"new_api_key_id": newAPIKeyID.String(),
+			"old_name":       oldName,
+			"new_name":       newName,
 		},
 	})
 }

@@ -38,6 +38,10 @@ func RequireAPIKey(pool *pgxpool.Pool, requiredScope apikeys.ApiKeyScope) func(h
 					apperrors.WriteError(w, r, http.StatusUnauthorized, "invalid_api_key", "Invalid API key")
 					return
 				}
+				if err == ErrExpiredAPIKey {
+					apperrors.WriteError(w, r, http.StatusUnauthorized, "expired_api_key", "API key expired")
+					return
+				}
 				log.Error().Err(err).Msg("Failed to validate API key")
 				apperrors.WriteInternalError(w, r, "Authentication failed")
 				return

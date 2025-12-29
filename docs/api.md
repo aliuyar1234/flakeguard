@@ -52,7 +52,7 @@ Invites:
 
 Audit:
 
-- `GET /api/v1/orgs/{org_id}/audit?limit=50` (OWNER/ADMIN)
+- `GET /api/v1/orgs/{org_id}/audit?limit=50&offset=0&action=...&actor=...&actor_user_id=...` (OWNER/ADMIN)
 
 ## Projects
 
@@ -68,9 +68,10 @@ Project settings:
 
 API keys:
 
-- `POST /api/v1/projects/{project_id}/api-keys`
+- `POST /api/v1/projects/{project_id}/api-keys` (supports `expires_in_days`)
 - `GET /api/v1/projects/{project_id}/api-keys`
 - `DELETE /api/v1/projects/{project_id}/api-keys/{api_key_id}`
+- `POST /api/v1/projects/{project_id}/api-keys/{api_key_id}/rotate` (creates a new key and revokes the old; returns token once)
 
 Flakes:
 
