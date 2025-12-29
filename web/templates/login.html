@@ -6,7 +6,7 @@
     <div class="error">{{.Error}}</div>
     {{end}}
 
-    <form method="POST" action="/api/v1/auth/login" data-json-form data-redirect="/orgs">
+    <form method="POST" action="/api/v1/auth/login" data-json-form data-redirect="{{.Redirect}}">
         <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
 
         <div class="form-group">
@@ -24,7 +24,7 @@
         </div>
 
         <div class="text-center mt-1">
-            <a href="/signup" class="link">Don't have an account? Sign up</a>
+            <a href="/signup{{if .Next}}?next={{urlquery .Next}}{{end}}" class="link">Don't have an account? Sign up</a>
         </div>
     </form>
 </div>

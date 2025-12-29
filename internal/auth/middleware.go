@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/flakeguard/flakeguard/internal/apperrors"
 	"github.com/google/uuid"
@@ -53,7 +54,8 @@ func RequireAuth(next http.Handler) http.Handler {
 func RequireAuthPage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if GetUserID(r.Context()) == uuid.Nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			nextURL := r.URL.RequestURI()
+			http.Redirect(w, r, "/login?next="+url.QueryEscape(nextURL), http.StatusSeeOther)
 			return
 		}
 		next.ServeHTTP(w, r)

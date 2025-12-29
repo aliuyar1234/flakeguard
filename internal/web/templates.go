@@ -15,6 +15,8 @@ type TemplateData struct {
 	UserID          uuid.UUID
 	IsAuthenticated bool
 	CSRFToken       string
+	Next            string
+	Redirect        string
 	Error           string
 	Success         string
 	Data            interface{}
@@ -36,9 +38,11 @@ func InitTemplates(templatesDir string) error {
 		"login.html",
 		"org_list.html",
 		"org_create.html",
+		"org_settings.html",
 		"project_list.html",
 		"project_create.html",
 		"project_settings.html",
+		"invite_accept.html",
 		"flakes_list.html",
 		"flake_detail.html",
 	}

@@ -2,6 +2,8 @@ package web
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/flakeguard/flakeguard/internal/auth"
 	"github.com/flakeguard/flakeguard/internal/orgs"
@@ -10,14 +12,34 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+func sanitizeNext(next string) string {
+	next = strings.TrimSpace(next)
+	if next == "" {
+		return ""
+	}
+	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
+		return ""
+	}
+	if strings.ContainsAny(next, "\r\n") {
+		return ""
+	}
+	return next
+}
+
 // HandleSignupPage renders the signup page
 func HandleSignupPage(isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		next := sanitizeNext(r.URL.Query().Get("next"))
+
 		// Check if user is already logged in
 		userID := auth.GetUserID(r.Context())
 		if userID != uuid.Nil {
 			// Already logged in - redirect to organizations
-			http.Redirect(w, r, "/orgs", http.StatusSeeOther)
+			redirect := "/orgs"
+			if next != "" {
+				redirect = next
+			}
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
 			return
 		}
 
@@ -31,11 +53,18 @@ func HandleSignupPage(isProduction bool) http.HandlerFunc {
 		// Set CSRF cookie
 		auth.SetCSRFCookie(w, csrfToken, isProduction)
 
+		redirect := "/login"
+		if next != "" {
+			redirect = "/login?next=" + url.QueryEscape(next)
+		}
+
 		// Render signup page
 		data := &TemplateData{
 			Title:           "Sign Up",
 			IsAuthenticated: false,
 			CSRFToken:       csrfToken,
+			Next:            next,
+			Redirect:        redirect,
 		}
 		RenderTemplate(w, r, "signup.html", data)
 	}
@@ -44,11 +73,18 @@ func HandleSignupPage(isProduction bool) http.HandlerFunc {
 // HandleLoginPage renders the login page
 func HandleLoginPage(isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		next := sanitizeNext(r.URL.Query().Get("next"))
+
+		redirect := "/orgs"
+		if next != "" {
+			redirect = next
+		}
+
 		// Check if user is already logged in
 		userID := auth.GetUserID(r.Context())
 		if userID != uuid.Nil {
 			// Already logged in - redirect to organizations
-			http.Redirect(w, r, "/orgs", http.StatusSeeOther)
+			http.Redirect(w, r, redirect, http.StatusSeeOther)
 			return
 		}
 
@@ -67,6 +103,8 @@ func HandleLoginPage(isProduction bool) http.HandlerFunc {
 			Title:           "Log In",
 			IsAuthenticated: false,
 			CSRFToken:       csrfToken,
+			Next:            next,
+			Redirect:        redirect,
 		}
 		RenderTemplate(w, r, "login.html", data)
 	}

@@ -1,0 +1,36 @@
+{{define "content"}}
+<div>
+    <div class="mb-1">
+        <a href="/orgs" class="link">&larr; Back to Organizations</a>
+    </div>
+
+    <div class="page-header mb-2">
+        <div>
+            <h2 class="mb-1">Accept Invitation</h2>
+            <p class="text-muted mb-0">Join an organization using an invite link</p>
+        </div>
+    </div>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Data.Token}}
+    <div class="card">
+        <form method="POST" action="/api/v1/orgs/invites/accept" data-json-form data-redirect="/orgs">
+            <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+            <input type="hidden" name="token" value="{{.Data.Token}}">
+
+            <div class="button-row">
+                <button type="submit" class="btn btn-success">Accept Invite</button>
+            </div>
+        </form>
+    </div>
+    {{else}}
+    <div class="empty-state">
+        <p class="mb-0">Missing invite token.</p>
+    </div>
+    {{end}}
+</div>
+{{end}}
+

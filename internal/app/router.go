@@ -84,6 +84,17 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 
 		// Organization members
 		r.Get("/{org_id}/members", orgs.HandleListMembers(pool))
+		r.Put("/{org_id}/members/{user_id}", orgs.HandleUpdateMemberRole(pool, auditor))
+		r.Delete("/{org_id}/members/{user_id}", orgs.HandleRemoveMember(pool, auditor))
+
+		// Organization audit log (OWNER/ADMIN)
+		r.Get("/{org_id}/audit", orgs.HandleListAudit(pool))
+
+		// Organization invites
+		r.Post("/{org_id}/invites", orgs.HandleCreateInvite(pool, auditor))
+		r.Get("/{org_id}/invites", orgs.HandleListInvites(pool))
+		r.Delete("/{org_id}/invites/{invite_id}", orgs.HandleRevokeInvite(pool, auditor))
+		r.Post("/invites/accept", orgs.HandleAcceptInvite(pool, auditor))
 
 		// Projects under organization
 		r.Post("/{org_id}/projects", projects.HandleCreate(pool, auditor))
@@ -130,11 +141,15 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 		// Organizations
 		r.Get("/orgs", web.HandleOrgsPage(pool, isProduction))
 		r.Get("/orgs/new", web.HandleOrgCreatePage(isProduction))
+		r.Get("/orgs/{org_id}/settings", web.HandleOrgSettingsPage(pool, isProduction))
 
 		// Projects
 		r.Get("/orgs/{org_id}/projects", web.HandleProjectsPage(pool, isProduction))
 		r.Get("/orgs/{org_id}/projects/new", web.HandleProjectCreatePage(pool, isProduction))
 		r.Get("/orgs/{org_id}/projects/{project_id}/settings", web.HandleProjectSettingsPage(pool, isProduction))
+
+		// Org invites
+		r.Get("/invites/accept", web.HandleInviteAcceptPage(isProduction))
 
 		// Flakes Dashboard (using slug-based URLs)
 		r.Get("/orgs/{org_slug}/projects/{project_slug}/flakes", web.HandleFlakesListPage(pool, isProduction))

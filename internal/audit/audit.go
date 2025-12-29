@@ -11,14 +11,19 @@ import (
 )
 
 const (
-	EventUserSignup      = "user.signup"
-	EventLoginFailed     = "auth.login_failed"
-	EventOrgCreated      = "org.created"
-	EventProjectCreated  = "project.created"
-	EventAPIKeyCreated   = "apikey.created"
-	EventAPIKeyRevoked   = "apikey.revoked"
-	EventSlackConfigured = "slack.configured"
-	EventSlackCleared    = "slack.cleared"
+	EventUserSignup           = "user.signup"
+	EventLoginFailed          = "auth.login_failed"
+	EventOrgCreated           = "org.created"
+	EventOrgInviteCreated     = "org.invite_created"
+	EventOrgInviteRevoked     = "org.invite_revoked"
+	EventOrgInviteAccepted    = "org.invite_accepted"
+	EventOrgMemberRoleUpdated = "org.member_role_updated"
+	EventOrgMemberRemoved     = "org.member_removed"
+	EventProjectCreated       = "project.created"
+	EventAPIKeyCreated        = "apikey.created"
+	EventAPIKeyRevoked        = "apikey.revoked"
+	EventSlackConfigured      = "slack.configured"
+	EventSlackCleared         = "slack.cleared"
 )
 
 // Event represents an audit log entry.
@@ -120,6 +125,66 @@ func (w *Writer) LogOrgCreated(ctx context.Context, orgID, userID uuid.UUID, slu
 		Action:      EventOrgCreated,
 		Meta: map[string]interface{}{
 			"slug": slug,
+		},
+	})
+}
+
+func (w *Writer) LogOrgInviteCreated(ctx context.Context, orgID, actorUserID, inviteID uuid.UUID, email, role string) error {
+	return w.Log(ctx, LogParams{
+		OrgID:       &orgID,
+		ActorUserID: &actorUserID,
+		Action:      EventOrgInviteCreated,
+		Meta: map[string]interface{}{
+			"invite_id": inviteID.String(),
+			"email":     email,
+			"role":      role,
+		},
+	})
+}
+
+func (w *Writer) LogOrgInviteRevoked(ctx context.Context, orgID, actorUserID, inviteID uuid.UUID) error {
+	return w.Log(ctx, LogParams{
+		OrgID:       &orgID,
+		ActorUserID: &actorUserID,
+		Action:      EventOrgInviteRevoked,
+		Meta: map[string]interface{}{
+			"invite_id": inviteID.String(),
+		},
+	})
+}
+
+func (w *Writer) LogOrgInviteAccepted(ctx context.Context, orgID, actorUserID, inviteID uuid.UUID) error {
+	return w.Log(ctx, LogParams{
+		OrgID:       &orgID,
+		ActorUserID: &actorUserID,
+		Action:      EventOrgInviteAccepted,
+		Meta: map[string]interface{}{
+			"invite_id": inviteID.String(),
+		},
+	})
+}
+
+func (w *Writer) LogOrgMemberRoleUpdated(ctx context.Context, orgID, actorUserID, targetUserID uuid.UUID, previousRole, newRole string) error {
+	return w.Log(ctx, LogParams{
+		OrgID:       &orgID,
+		ActorUserID: &actorUserID,
+		Action:      EventOrgMemberRoleUpdated,
+		Meta: map[string]interface{}{
+			"target_user_id": targetUserID.String(),
+			"previous_role":  previousRole,
+			"new_role":       newRole,
+		},
+	})
+}
+
+func (w *Writer) LogOrgMemberRemoved(ctx context.Context, orgID, actorUserID, targetUserID uuid.UUID, removedRole string) error {
+	return w.Log(ctx, LogParams{
+		OrgID:       &orgID,
+		ActorUserID: &actorUserID,
+		Action:      EventOrgMemberRemoved,
+		Meta: map[string]interface{}{
+			"target_user_id": targetUserID.String(),
+			"role":           removedRole,
 		},
 	})
 }

@@ -1,0 +1,192 @@
+{{define "content"}}
+<div>
+    <div class="mb-1">
+        <a href="/orgs/{{.Data.OrgID}}/projects" class="link">&larr; Back to Projects</a>
+    </div>
+
+    <div class="page-header mb-2">
+        <div>
+            <h2 class="mb-1">{{.Data.OrgName}} Settings</h2>
+            <p class="text-muted mb-0">Manage members and invitations</p>
+        </div>
+    </div>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+    {{if .Success}}
+    <div class="success">{{.Success}}</div>
+    {{end}}
+
+    <section class="mb-2">
+        <h3>Organization</h3>
+        <div class="card">
+            <div class="card-row">
+                <div>
+                    <div class="mb-1"><strong>Name:</strong> {{.Data.OrgName}}</div>
+                    <div class="text-muted">Slug: <span class="code-pill">{{.Data.OrgSlug}}</span></div>
+                </div>
+                <div class="text-muted">Your role: <strong>{{.Data.ActorRole}}</strong></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-2">
+        <h3>Members</h3>
+
+        {{if .Data.Members}}
+        <div class="card-grid">
+            {{range .Data.Members}}
+            <div class="card">
+                <div class="card-row">
+                    <div>
+                        <h3 class="mb-1">{{.Email}}{{if eq .UserID $.UserID}} <span class="text-muted">(you)</span>{{end}}</h3>
+                        <div class="text-muted mb-1">Role: <strong>{{.Role}}</strong></div>
+                        <div class="text-muted">Joined: {{.CreatedAt.Format "2006-01-02 15:04"}}</div>
+                    </div>
+                    <div>
+                        {{if $.Data.CanMutate}}
+                        <form method="POST" action="/api/v1/orgs/{{$.Data.OrgID}}/members/{{.UserID}}" data-json-form data-reload="true" class="mb-1">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="_method" value="PUT">
+
+                            <div class="form-group">
+                                <label class="hidden" for="role-{{.UserID}}">Role</label>
+                                <select id="role-{{.UserID}}" name="role">
+                                    {{if eq $.Data.ActorRole "OWNER"}}
+                                    <option value="OWNER" {{if eq (printf "%s" .Role) "OWNER"}}selected{{end}}>OWNER</option>
+                                    <option value="ADMIN" {{if eq (printf "%s" .Role) "ADMIN"}}selected{{end}}>ADMIN</option>
+                                    {{end}}
+                                    <option value="MEMBER" {{if eq (printf "%s" .Role) "MEMBER"}}selected{{end}}>MEMBER</option>
+                                    <option value="VIEWER" {{if eq (printf "%s" .Role) "VIEWER"}}selected{{end}}>VIEWER</option>
+                                </select>
+                            </div>
+
+                            <div class="button-row">
+                                <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                            </div>
+                        </form>
+
+                        <form method="POST" action="/api/v1/orgs/{{$.Data.OrgID}}/members/{{.UserID}}" data-json-form data-confirm="{{if eq .UserID $.UserID}}Leave this organization?{{else}}Remove this member?{{end}}" data-reload="true">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="btn btn-danger btn-sm">{{if eq .UserID $.UserID}}Leave{{else}}Remove{{end}}</button>
+                        </form>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+            <p class="mb-0">No members found.</p>
+        </div>
+        {{end}}
+    </section>
+
+    {{if .Data.CanMutate}}
+    <section class="mb-2">
+        <h3>Invitations</h3>
+
+        <details class="mb-1">
+            <summary>Invite a member</summary>
+            <div class="card mt-1">
+                <form method="POST" action="/api/v1/orgs/{{.Data.OrgID}}/invites" data-json-form data-token-target="#newInviteLink" data-token-reveal="#newInviteCard">
+                    <input type="hidden" name="_csrf" value="{{.CSRFToken}}">
+
+                    <div class="form-group">
+                        <label for="invite_email">Email</label>
+                        <input type="email" id="invite_email" name="email" required placeholder="teammate@example.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="invite_role">Role</label>
+                        <select id="invite_role" name="role">
+                            {{if eq .Data.ActorRole "OWNER"}}
+                            <option value="ADMIN">ADMIN</option>
+                            {{end}}
+                            <option value="MEMBER" selected>MEMBER</option>
+                            <option value="VIEWER">VIEWER</option>
+                        </select>
+                        <small class="helper-text">Admins can manage projects and settings.</small>
+                    </div>
+
+                    <div class="button-row">
+                        <button type="submit" class="btn btn-primary">Create Invite</button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
+        <div id="newInviteCard" class="card hidden mb-1">
+            <h3 class="mb-1">Invite Created</h3>
+            <p class="text-muted mb-1">Copy this link and send it to the user. It can only be shown once.</p>
+            <pre id="newInviteLink" class="code-block"></pre>
+            <div class="button-row mt-1">
+                <a href="/orgs/{{.Data.OrgID}}/settings" class="btn btn-secondary btn-sm">Reload Settings</a>
+            </div>
+        </div>
+
+        {{if .Data.Invites}}
+        <div class="card-grid">
+            {{range .Data.Invites}}
+            <div class="card">
+                <div class="card-row">
+                    <div>
+                        <h3 class="mb-1">{{.Email}}</h3>
+                        <div class="text-muted mb-1">Role: <strong>{{.Role}}</strong></div>
+                        <div class="text-muted mb-1">Expires: {{.ExpiresAt.Format "2006-01-02 15:04"}}</div>
+                        <div class="text-muted">Created by: {{.CreatedByEmail}}</div>
+                    </div>
+                    <div>
+                        <form method="POST" action="/api/v1/orgs/{{$.Data.OrgID}}/invites/{{.ID}}" data-json-form data-confirm="Revoke this invite?" data-reload="true">
+                            <input type="hidden" name="_csrf" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <button type="submit" class="btn btn-danger btn-sm">Revoke</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="empty-state">
+            <p class="mb-0">No active invites.</p>
+        </div>
+        {{end}}
+    </section>
+
+    <section class="mb-2">
+        <h3>Audit Log</h3>
+
+        {{if .Data.AuditEvents}}
+        <table class="evidence-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Action</th>
+                    <th>Actor</th>
+                    <th>Meta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Data.AuditEvents}}
+                <tr>
+                    <td>{{.CreatedAt}}</td>
+                    <td><span class="code-pill">{{.Action}}</span></td>
+                    <td>{{.Actor}}</td>
+                    <td><pre class="code-block">{{.Meta}}</pre></td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <div class="empty-state">
+            <p class="mb-0">No recent audit events.</p>
+        </div>
+        {{end}}
+    </section>
+    {{end}}
+</div>
+{{end}}

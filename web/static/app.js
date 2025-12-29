@@ -120,7 +120,11 @@ async function submitJsonForm(form) {
 
     const tokenTarget = form.dataset.tokenTarget;
     if (tokenTarget) {
-      const token = body?.data?.api_key?.token;
+      const token =
+        body?.data?.api_key?.token ??
+        body?.data?.invite?.accept_url ??
+        body?.data?.invite?.token ??
+        body?.data?.token;
       if (token) {
         const el = document.querySelector(tokenTarget);
         if (el) el.textContent = token;

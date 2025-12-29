@@ -21,6 +21,15 @@ func (r OrgRole) CanMutate() bool {
 	return r == RoleOwner || r == RoleAdmin
 }
 
+func (r OrgRole) IsValid() bool {
+	switch r {
+	case RoleOwner, RoleAdmin, RoleMember, RoleViewer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Org represents an organization in the system
 type Org struct {
 	ID              uuid.UUID `db:"id"`
