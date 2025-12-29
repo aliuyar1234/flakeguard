@@ -23,8 +23,8 @@ This is a public, high-signal checklist of work that would make FlakeGuard feel 
 - [x] Document the GitHub Action versioning strategy (`uses: owner/repo@vX`).
 
 ### Critical test coverage gaps
-- [ ] Add integration tests for: org invites flow (create → accept), member role changes, member removal, and “last OWNER” guardrails.
-- [ ] Add tests for audit entries for invites/membership changes.
+- [x] Add integration tests for: org invites flow (create → accept), member role changes, member removal, and “last OWNER” guardrails.
+- [x] Add tests for audit entries for invites/membership changes.
 
 ### Repo/module identity
 - [x] Decide on the canonical Go module path:
