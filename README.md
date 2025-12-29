@@ -79,8 +79,13 @@ flakeguard/
   cmd/flakeguard/          # Application entry point
   internal/                # Application packages
   migrations/              # SQL migrations
-  web/                     # Server-rendered dashboard (templates + static)
+  web/                     # Server-rendered dashboard (templates + static)     
   action/                  # GitHub Action (composite) for JUnit upload
   docs/                    # Documentation
   examples/                # Example workflows
 ```
+
+## Support
+
+- Bug reports / feature requests: GitHub Issues
+- Security issues: see `SECURITY.md`

@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem in FlakeGuard
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the exact steps to reproduce the behavior.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Please redact secrets (API keys, DSNs, tokens).
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        FlakeGuard version/commit:
+        OS:
+        Postgres:
+        Docker:
+        Go:
+
