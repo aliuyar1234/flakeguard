@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/apperrors"
-	"github.com/flakeguard/flakeguard/internal/audit"
+	"github.com/aliuyar1234/flakeguard/internal/apperrors"
+	"github.com/aliuyar1234/flakeguard/internal/audit"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

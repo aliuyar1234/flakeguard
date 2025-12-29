@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/flakeguard/flakeguard/internal/apperrors"
-	"github.com/flakeguard/flakeguard/internal/audit"
-	"github.com/flakeguard/flakeguard/internal/auth"
+	"github.com/aliuyar1234/flakeguard/internal/apperrors"
+	"github.com/aliuyar1234/flakeguard/internal/audit"
+	"github.com/aliuyar1234/flakeguard/internal/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

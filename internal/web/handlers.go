@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/flakeguard/flakeguard/internal/auth"
-	"github.com/flakeguard/flakeguard/internal/orgs"
+	"github.com/aliuyar1234/flakeguard/internal/auth"
+	"github.com/aliuyar1234/flakeguard/internal/orgs"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"

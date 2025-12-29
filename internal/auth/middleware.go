@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/flakeguard/flakeguard/internal/apperrors"
+	"github.com/aliuyar1234/flakeguard/internal/apperrors"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )

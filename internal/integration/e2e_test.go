@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/app"
-	"github.com/flakeguard/flakeguard/internal/auth"
-	"github.com/flakeguard/flakeguard/internal/config"
-	"github.com/flakeguard/flakeguard/internal/flake"
-	"github.com/flakeguard/flakeguard/internal/ingest"
+	"github.com/aliuyar1234/flakeguard/internal/app"
+	"github.com/aliuyar1234/flakeguard/internal/auth"
+	"github.com/aliuyar1234/flakeguard/internal/config"
+	"github.com/aliuyar1234/flakeguard/internal/flake"
+	"github.com/aliuyar1234/flakeguard/internal/ingest"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

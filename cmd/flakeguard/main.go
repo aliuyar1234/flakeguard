@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/app"
-	"github.com/flakeguard/flakeguard/internal/config"
-	"github.com/flakeguard/flakeguard/internal/retention"
+	"github.com/aliuyar1234/flakeguard/internal/app"
+	"github.com/aliuyar1234/flakeguard/internal/config"
+	"github.com/aliuyar1234/flakeguard/internal/retention"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"

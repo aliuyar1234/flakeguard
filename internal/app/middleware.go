@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/apperrors"
-	"github.com/flakeguard/flakeguard/internal/auth"
+	"github.com/aliuyar1234/flakeguard/internal/apperrors"
+	"github.com/aliuyar1234/flakeguard/internal/auth"
 	"github.com/go-chi/httprate"
 	"github.com/rs/zerolog/log"
 )

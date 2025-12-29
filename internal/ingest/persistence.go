@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/config"
-	"github.com/flakeguard/flakeguard/internal/flake"
+	"github.com/aliuyar1234/flakeguard/internal/config"
+	"github.com/aliuyar1234/flakeguard/internal/flake"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

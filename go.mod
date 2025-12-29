@@ -1,4 +1,4 @@
-module github.com/flakeguard/flakeguard
+module github.com/aliuyar1234/flakeguard
 
 go 1.22.2
 

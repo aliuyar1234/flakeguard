@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/flakeguard/flakeguard/internal/apperrors"
+	"github.com/aliuyar1234/flakeguard/internal/apperrors"
 )
 
 // ErrorResponse represents the error envelope per SSOT Section 8.1.

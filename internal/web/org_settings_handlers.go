@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/flakeguard/flakeguard/internal/audit"
-	"github.com/flakeguard/flakeguard/internal/auth"
-	"github.com/flakeguard/flakeguard/internal/orgs"
+	"github.com/aliuyar1234/flakeguard/internal/audit"
+	"github.com/aliuyar1234/flakeguard/internal/auth"
+	"github.com/aliuyar1234/flakeguard/internal/orgs"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"

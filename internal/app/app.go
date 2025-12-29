@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/config"
-	"github.com/flakeguard/flakeguard/internal/db"
-	"github.com/flakeguard/flakeguard/internal/web"
+	"github.com/aliuyar1234/flakeguard/internal/config"
+	"github.com/aliuyar1234/flakeguard/internal/db"
+	"github.com/aliuyar1234/flakeguard/internal/web"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

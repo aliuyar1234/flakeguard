@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/db"
+	"github.com/aliuyar1234/flakeguard/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

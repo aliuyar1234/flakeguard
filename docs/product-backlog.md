@@ -29,7 +29,7 @@ This is a public, high-signal checklist of work that would make FlakeGuard feel 
 ### Repo/module identity
 - [ ] Decide on the canonical Go module path:
   - Option A: move repo to `github.com/flakeguard/flakeguard`
-  - Option B: change `go.mod` + all imports to match the current GitHub repo path
+  - Option B: change `go.mod` + all imports to match the current GitHub repo path (`github.com/aliuyar1234/flakeguard`)
 - [ ] Ensure README examples match the chosen repo/module path.
 
 ## P1 — Strong product polish (high value)
@@ -72,4 +72,3 @@ This is a public, high-signal checklist of work that would make FlakeGuard feel 
 ### Performance/scaling
 - [ ] Background ingestion processing (queue) for large JUnit uploads.
 - [ ] Add query-level performance monitoring and tune indexes for list endpoints.
-

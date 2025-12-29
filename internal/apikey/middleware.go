@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/flakeguard/flakeguard/internal/apikeys"
-	"github.com/flakeguard/flakeguard/internal/apperrors"
+	"github.com/aliuyar1234/flakeguard/internal/apikeys"
+	"github.com/aliuyar1234/flakeguard/internal/apperrors"
 	"github.com/go-chi/httprate"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"

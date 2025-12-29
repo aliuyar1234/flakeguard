@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flakeguard/flakeguard/migrations"
+	"github.com/aliuyar1234/flakeguard/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
