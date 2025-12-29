@@ -10,6 +10,34 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// SecurityHeadersMiddleware adds standard hardening headers to all responses.
+func SecurityHeadersMiddleware(isProduction bool) func(http.Handler) http.Handler {
+	csp := "default-src 'self'; " +
+		"base-uri 'none'; " +
+		"frame-ancestors 'none'; " +
+		"form-action 'self'; " +
+		"object-src 'none'; " +
+		"img-src 'self' data:; " +
+		"style-src 'self'; " +
+		"script-src 'self'"
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Security-Policy", csp)
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+
+			if isProduction {
+				w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // LoggingMiddleware logs HTTP requests with structured fields.
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

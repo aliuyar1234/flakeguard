@@ -25,11 +25,15 @@ const (
 )
 
 func main() {
-	_ = godotenv.Load()
+        if len(os.Args) > 1 && os.Args[1] == "admin" {
+                os.Exit(runAdmin(os.Args[2:]))
+        }
 
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
+        _ = godotenv.Load()
+
+        cfg, err := config.Load()
+        if err != nil {
+                fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
 		os.Exit(1)
 	}
 

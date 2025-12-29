@@ -35,9 +35,9 @@ This is a public, high-signal checklist of work that would make FlakeGuard feel 
 ## P1 — Strong product polish (high value)
 
 ### Security & hardening
-- [ ] Add standard security headers middleware (CSP, X-Content-Type-Options, Referrer-Policy, etc.).
-- [ ] Add account email verification or an explicit “no email verification” stance in docs.
-- [ ] Add password reset flow (or an admin CLI flow) so users don’t get locked out.
+- [x] Add standard security headers middleware (CSP, X-Content-Type-Options, Referrer-Policy, etc.).
+- [x] Add account email verification or an explicit “no email verification” stance in docs.
+- [x] Add password reset flow (or an admin CLI flow) so users don’t get locked out.
 - [ ] Add API key expiration + rotation UX (optional but strongly recommended).
 - [ ] Add org audit log pagination + filtering (action/type/actor).
 

@@ -31,6 +31,7 @@ func NewRouter(pool *pgxpool.Pool, cfg *config.Config) *chi.Mux {
 	r.Use(RequestIDMiddleware)       // Add request ID to context
 	r.Use(LoggingMiddleware)         // Structured request logging
 	r.Use(RecoveryMiddleware)        // Recover from panics
+	r.Use(SecurityHeadersMiddleware(isProduction))
 	r.Use(cors.Handler(cors.Options{ // CORS (pinned dep)
 		AllowedOrigins:   []string{cfg.BaseURL},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

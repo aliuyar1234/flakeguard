@@ -27,6 +27,16 @@ Operational notes for running and maintaining FlakeGuard.
 - The API never returns the full webhook URL; it only reports whether it is set.
 - Removing Slack integration disables notifications for that project.
 
+## Account recovery
+
+FlakeGuard does not currently provide an email-driven password reset flow.
+
+Use the admin command to reset a user's password:
+
+```bash
+flakeguard admin reset-password --email user@example.com
+```
+
 ## Retention Policy (Fixed)
 
 Retention runs automatically:

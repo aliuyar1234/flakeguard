@@ -16,6 +16,16 @@ Production recommendations:
 - Use a strong `FG_JWT_SECRET` (32+ chars; treat as a secret)
 - Run Postgres backups (at least daily) and test restore
 
+## Authentication notes
+
+- FlakeGuard currently does not perform email verification for new accounts.
+- For public deployments, restrict access (VPN, allowlisted network, reverse-proxy auth) or implement your own verification/SSO layer in front.
+- If a user gets locked out, use the admin command:
+
+```bash
+flakeguard admin reset-password --email user@example.com
+```
+
 ## Migrations
 
 - `FG_ENV=dev` runs migrations automatically on startup.
@@ -41,4 +51,3 @@ Recommended order:
 2. Apply DB migrations
 3. Deploy the new app version
 4. Verify `GET /readyz` and basic dashboard flows
-
